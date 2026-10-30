@@ -1,0 +1,7 @@
+{
+  "description": "Preflight context and completion routing. No build execution, network access or automatic permissions.",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/hooks/preflight.py\"", "statusMessage": "Loading Preflight MCP workflow", "additionalContextLimit": 500}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/hooks/preflight.py\"", "statusMessage": "Checking Preflight completion notification", "additionalContextLimit": 500}]}]
+  }
+}

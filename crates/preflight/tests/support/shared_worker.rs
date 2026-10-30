@@ -1,0 +1,2 @@
+use std::{fs::OpenOptions,io::Write,time::Duration};
+fn main(){let args:Vec<_>=std::env::args().skip(1).collect();let mut calls=OpenOptions::new().create(true).append(true).open(&args[0]).unwrap();writeln!(calls,"executed").unwrap();println!("started");std::thread::sleep(Duration::from_millis(args[1].parse().unwrap()));if args[2]=="fail"{std::process::exit(7);}std::fs::write("result.txt","shared output").unwrap();}

@@ -1,0 +1,18 @@
+version: 1
+suite: group-02
+adapter: tiny
+cases:
+  - id: echo
+    files: {main.my: 'print group-02'}
+    stdin: ' input'
+    execute: {mode: compile_and_run, entry: main.my}
+    expect:
+      compile: {exit_code: 0}
+      run: {exit_code: 0, stdout: {exact: 'group-02 input'}}
+      files: {result.txt: {exact: 'group-02'}}
+  - id: syntax-error
+    files: {main.my: invalid}
+    execute: {mode: compile, entry: main.my}
+    expect:
+      compile: {exit_code: 1, stderr: {contains: 'expected print'}}
+      diagnostics: {exact: 'error: expected print'}

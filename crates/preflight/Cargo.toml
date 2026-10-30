@@ -1,0 +1,61 @@
+[package]
+name = "preflight"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+preflight-client = { path = "../preflight-client" }
+anyhow = "1.0.104"
+jiff = "=0.2.38"
+axum = "0.8.9"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+tokio = { version = "1.54.1", features = ["full"] }
+rusqlite = { version = "0.41.1", features = ["bundled", "functions", "fallible_uint"] }
+toml = "1.1.8"
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
+quick-xml = "0.42.0"
+sha2 = "0.11.1"
+tar = "=0.4.46"
+zstd = { version = "0.14.3", default-features = false }
+getrandom = "0.4.3"
+zip = { version = "=9.1.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+futures-core = "0.3.34"
+regex = "1.13.1"
+semver = "1.0.28"
+tempfile = "3.27.0"
+age = { version = "=0.12.1", default-features = false }
+
+[dev-dependencies]
+rmcp = { version = "3.8.0", features = ["client", "transport-streamable-http-client-reqwest"] }
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }
+
+[dependencies.rmcp]
+version = "3.8.0"
+features = ["server", "macros", "transport-streamable-http-server"]
+
+[dependencies.uuid]
+version = "1.29.0"
+features = ["v7", "serde"]
+
+[dependencies.tokio-util]
+version = "0.7.20"
+features = ["rt", "io"]
+
+[dependencies.fs2]
+version = "0.4.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[dependencies.reqwest]
+version = "0.13.5"
+default-features = false
+features = ["json", "stream", "rustls"]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp"] }

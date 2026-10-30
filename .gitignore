@@ -1,0 +1,16 @@
+/target/
+/data/
+*.sqlite3*
+/.validation/
+/preflight.toml
+/output/
+/dist/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+/admin-token
+/*.admin-token
+/.playwright-cli/
+
+/crates/preflight-client/node_modules/

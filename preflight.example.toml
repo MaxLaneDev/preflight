@@ -1,0 +1,4 @@
+version = 1
+bind = "127.0.0.1:4170"
+data_dir = "data"
+allowed_roots = ["examples"]

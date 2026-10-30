@@ -1,0 +1,30 @@
+version: 1
+build:
+  version: 1
+  project: {name: Ten custom-language fixture groups}
+  pipeline:
+    stages:
+      - id: compiler
+        command: {program: rustc, args: [compiler.rs, -o, compiler.exe]}
+        outputs: {compiler: {path: compiler.exe, type: executable}}
+compiler: '${artifact.compiler.compiler}'
+max_parallel_groups: 10
+adapter:
+  name: tiny
+  source_extension: my
+  compile: {program: '{compiler}', args: ['{entry}', '{output}']}
+  run: {program: '{output}'}
+  timeout_seconds: 30
+  capabilities: [compile, compile_and_run]
+  diagnostics_regex: 'error: [^\n]+'
+suites:
+  - suites/group-01.yaml
+  - suites/group-02.yaml
+  - suites/group-03.yaml
+  - suites/group-04.yaml
+  - suites/group-05.yaml
+  - suites/group-06.yaml
+  - suites/group-07.yaml
+  - suites/group-08.yaml
+  - suites/group-09.yaml
+  - suites/group-10.yaml

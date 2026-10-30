@@ -1,0 +1,32 @@
+name: Draft release
+on:
+  push:
+    tags: ['v[0-9]*']
+permissions:
+  contents: read
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+    with:
+      include_deferred: false
+  draft:
+    needs: check
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: preflight-*
+          path: artifacts
+      - name: Verify release files and generate checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/release-files.py artifacts release-assets "$RELEASE_TAG"
+      - name: Create reviewable draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.py release-assets/SHA256SUMS

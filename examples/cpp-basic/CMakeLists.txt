@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(preflight_cpp LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+add_executable(arithmetic main.cpp)
+enable_testing()
+add_test(NAME arithmetic COMMAND arithmetic)

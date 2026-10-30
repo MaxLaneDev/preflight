@@ -1,0 +1,30 @@
+{
+  "name": "preflight",
+  "version": "0.1.1",
+  "description": "Local builds, change queues and compact results through Preflight MCP",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Preflight",
+    "shortDescription": "Local builds and tests through MCP",
+    "longDescription": "Run builds, inspect test results and manage change queues through Preflight MCP. Install and start the Preflight server separately using the curl installer from GitHub Releases or Homebrew once published. The server includes the Web UI and MCP endpoint. The plugin does not include the server.",
+    "logo": "./assets/icon.png",
+    "composerIcon": "./assets/icon.png",
+    "brandColor": "#0969DA",
+    "brandColorDark": "#4493F8",
+    "developerName": "MaxLaneDev",
+    "category": "Productivity",
+    "websiteURL": "https://github.com/MaxLaneDev/preflight",
+    "supportURL": "https://github.com/MaxLaneDev/preflight/issues",
+    "privacyPolicyURL": "https://github.com/MaxLaneDev/preflight/blob/main/PRIVACY.md"
+  },
+  "author": {
+    "name": "MaxLaneDev",
+    "url": "https://github.com/MaxLaneDev"
+  },
+  "homepage": "https://github.com/MaxLaneDev/preflight",
+  "repository": "https://github.com/MaxLaneDev/preflight",
+  "license": "MIT",
+  "requires_local_executor": true
+}

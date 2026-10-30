@@ -1,0 +1,31 @@
+# Codex plugin
+
+The plugin connects to a running server at `http://127.0.0.1:4170/mcp`.
+Install/start the [server](server-setup.md) first. The plugin does not include it.
+
+## Build a local marketplace
+
+```sh
+python3 scripts/package-codex-plugin.py output/preflight-plugin
+codex plugin marketplace add "$PWD/output/preflight-plugin" --json
+codex plugin add preflight@preflight-local --json
+```
+
+Use a new destination for each package. Keep that directory available. Do not also
+configure the same MCP endpoint as a standalone connection.
+
+## Make a distributable ZIP
+
+```sh
+python3 scripts/package-codex-plugin.py output/preflight-plugin.zip --zip
+python3 scripts/test-codex-plugin.py
+```
+
+Optional native hooks require Python 3. Review/trust each hook in Codex's hooks UI.
+Installation never grants trust. SessionStart adds a brief workflow reminder;
+UserPromptSubmit validates completion messages. Neither approves tools or starts builds.
+[Completion delivery](codex-completion-hook.md) is separate.
+
+Public directory submission is pending. OpenAI does not accept lifecycle hooks
+in submitted ZIPs and requires eligibility for local MCP plugins.
+[Official requirements](https://developers.openai.com/plugins/deploy/submission).

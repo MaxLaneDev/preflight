@@ -1,0 +1,11 @@
+version: 1
+project: { name: C build and executable tests }
+pipeline:
+  stages:
+    - id: build
+      command: { program: cc, args: [-Wall, -Wextra, -Werror, main.c, -o, example.exe] }
+      outputs: { app: { path: example.exe, type: executable } }
+    - id: tests
+      kind: test
+      needs: [build]
+      command: { program: '${artifact.build.app}', args: [] }

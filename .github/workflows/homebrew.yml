@@ -1,0 +1,33 @@
+name: Update Homebrew formula
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+concurrency:
+  group: homebrew-formula
+  cancel-in-progress: false
+jobs:
+  formula:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - name: Verify published assets and update the tap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          if [ "$latest" != "$RELEASE_TAG" ]; then exit 0; fi
+          mkdir -p .validation/homebrew-release Formula
+          gh release download "$RELEASE_TAG" --pattern '*-macos-aarch64.tar.gz' --pattern SHA256SUMS --dir .validation/homebrew-release
+          python3 scripts/homebrew-release.py .validation/homebrew-release "$RELEASE_TAG" .validation/preflight.rb
+          cp .validation/preflight.rb Formula/preflight.rb
+          git add Formula/preflight.rb
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Update Homebrew formula for $RELEASE_TAG"
+          git push origin HEAD:main

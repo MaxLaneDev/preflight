@@ -1,0 +1,13 @@
+version: 1
+project: { name: CMake build and CTest JUnit }
+pipeline:
+  stages:
+    - id: build
+      command: { program: bash, args: [build.sh] }
+      outputs: { app: { path: build/arithmetic, type: executable } }
+    - id: ctest
+      kind: test
+      needs: [build]
+      inputs: { build/arithmetic: '${artifact.build.app}' }
+      command: { program: bash, args: [check.sh] }
+      junit: [build/results.xml]

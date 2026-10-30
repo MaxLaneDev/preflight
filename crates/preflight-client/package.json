@@ -1,0 +1,23 @@
+{
+  "name": "preflight-editor-assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/editor-source.mjs --bundle --format=esm --minify --outfile=src/editor-bundle.mjs && node ../../scripts/client-notices.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.0.0",
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/lang-json": "^6.0.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/lint": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "@lezer/highlight": "^1.0.0",
+    "codemirror": "^6.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

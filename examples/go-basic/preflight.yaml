@@ -1,0 +1,17 @@
+version: 1
+project: { name: Go build and existing tests }
+pipeline:
+  stages:
+    - id: build
+      command: { program: go, args: [build, -o, example.exe, .] }
+      env: { GOPROXY: 'off', GOSUMDB: 'off' }
+      outputs: { app: { path: example.exe, type: executable } }
+    - id: smoke
+      kind: test
+      needs: [build]
+      command: { program: '${artifact.build.app}', args: [] }
+    - id: go-tests
+      kind: test
+      needs: [build]
+      command: { program: go, args: [test, ./...] }
+      env: { GOPROXY: 'off', GOSUMDB: 'off' }

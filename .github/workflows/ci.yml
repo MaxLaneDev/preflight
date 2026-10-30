@@ -1,0 +1,66 @@
+name: Check and package
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      include_deferred:
+        description: 'Also run currently deferred Windows/x86_64 targets'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      include_deferred:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  check:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.include_deferred && '["macos-15","ubuntu-24.04-arm","ubuntu-24.04","macos-15-intel","windows-2025"]' || '["macos-15","ubuntu-24.04-arm"]') }}
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: cargo fmt --all --check
+      - run: cargo clippy --release --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --release --locked --workspace
+      - run: cargo build --release --locked --workspace
+      - run: node --test crates/preflight-client/tests/*.test.mjs
+        shell: bash
+      - run: python scripts/test-install-sh.py
+        if: runner.os != 'Windows'
+      - run: python scripts/test-codex-plugin.py
+      - run: python scripts/test-public-export.py
+      - run: python scripts/test-release.py
+        if: runner.os != 'Windows'
+      - name: Package server with required Web UI and MCP
+        shell: bash
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
+          python scripts/release.py package --server "target/release/preflight$suffix" --destination dist
+      - run: python scripts/smoke-package.py dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: preflight-${{ matrix.os }}
+          path: dist/
+          if-no-files-found: error
