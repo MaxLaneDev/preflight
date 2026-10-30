@@ -98,7 +98,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap();
         let mut stage:StageDefinition=serde_json::from_value(serde_json::json!({"id":"test","setup":[{"program":".","args":["./setup.sh"]}],"command":{"program":"new-tool","args":["$(touch should-not-exist)","a'b"]}})).unwrap();
-        std::fs::write(root.join("setup.sh"),"mkdir tools\nprintf '#!/bin/sh\\nprintf \\\"%%s\\\\n\\\" \\\"$EXPORTED\\\" \\\"$1\\\" \\\"$2\\\"\\n' > tools/new-tool\nchmod +x tools/new-tool\nexport PATH=\"$PREFLIGHT_WORKSPACE/tools:$PATH\"\nexport EXPORTED=installed\n").unwrap();
+        std::fs::write(
+            root.join("setup.sh"),
+            r#"mkdir tools
+cat > tools/new-tool <<'TOOL'
+#!/bin/sh
+printf '%s\n' "$EXPORTED" "$1" "$2"
+TOOL
+chmod +x tools/new-tool
+export PATH="$PREFLIGHT_WORKSPACE/tools:$PATH"
+export EXPORTED=installed
+"#,
+        )
+        .unwrap();
         let mut command = stage.command.clone();
         prepare(&stage, &root, &root, &mut command).unwrap();
         let result = std::process::Command::new(&command.program)
