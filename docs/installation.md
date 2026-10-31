@@ -1,9 +1,7 @@
 # Installation
 
-Public packages and the Homebrew tap are not published. Use [server setup](server-setup.md)
-for a source installation.
-
-After the first public release, install the server with either command:
+[Release packages](https://github.com/MaxLaneDev/preflight/releases/latest) support
+macOS ARM64 and Linux ARM64. Install with curl:
 
 ```sh
 curl -fsSL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.sh | sh
@@ -15,8 +13,12 @@ brew install MaxLaneDev/preflight/preflight
 brew services start MaxLaneDev/preflight/preflight
 ```
 
-The first release targets macOS ARM64 and Linux ARM64; the Homebrew formula targets
-macOS ARM64. The installer needs curl, tar and a SHA-256 tool; it does not start the server.
+If Homebrew asks you to trust the formula, run
+`brew trust --formula MaxLaneDev/preflight/preflight`, then retry installation.
+
+The Homebrew formula supports macOS ARM64. The curl installer needs curl, tar and
+a SHA-256 tool; it prints the start command. [Server setup](server-setup.md) covers
+project access and resource limits.
 
 ## Install a local release package
 

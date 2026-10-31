@@ -1,5 +1,34 @@
 # Set up the server
 
+## Installed packages
+
+The [curl installer](installation.md) creates a configuration and private token.
+Start the installed server:
+
+```sh
+"$HOME/.local/share/preflight/bin/current/preflight" \
+  --config "$HOME/.config/preflight/preflight.toml" serve
+```
+
+On macOS, copy its token for **Settings**:
+
+```sh
+pbcopy < "$HOME/.config/preflight/preflight.admin-token"
+```
+
+For Homebrew, use its configuration and token instead:
+
+```sh
+brew services start MaxLaneDev/preflight/preflight
+pbcopy < "$(brew --prefix)/etc/preflight/admin-token"
+```
+
+Open **http://127.0.0.1:4170 → Settings** and add your project directories to
+**Allowed project roots**. New installations allow no directories. Keep the
+generated configuration and token; the following manual setup is for source builds.
+
+## Source builds
+
 ## 1. Build and create an admin token
 
 For a new installation, run from the source directory. Keep an existing token and configuration.

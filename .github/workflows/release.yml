@@ -33,4 +33,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.sh release-assets/SHA256SUMS
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.sh release-assets/SHA256SUMS release-assets/RELEASE_NOTES.md

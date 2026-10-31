@@ -21,7 +21,8 @@ sh scripts/package-codex-plugin.sh output/preflight-plugin.zip --zip
 sh scripts/test-codex-plugin.sh
 ```
 
-Optional native hooks require Python 3. Review/trust each hook in Codex's hooks UI.
+Optional native hooks use the installed Preflight binary and shell scripts.
+Review/trust each hook in Codex's hooks UI.
 Installation never grants trust. SessionStart adds a brief workflow reminder;
 UserPromptSubmit validates completion messages. Neither approves tools or starts builds.
 [Completion delivery](codex-completion-hook.md) is separate.

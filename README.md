@@ -43,7 +43,25 @@ Inside a run: build first, tests in parallel, then package.
 [Queue examples](docs/change-queues.md) · [MCP setup](docs/mcp-configuration.md) ·
 [Retry a stage or test](docs/retries.md)
 
-## Start from source
+## Install
+
+macOS ARM64 or Linux ARM64:
+
+```sh
+curl -fsSL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.sh | sh
+```
+
+On macOS, Homebrew can manage the server:
+
+```sh
+brew tap MaxLaneDev/preflight https://github.com/MaxLaneDev/preflight
+brew install MaxLaneDev/preflight/preflight
+```
+
+Follow [server setup](docs/server-setup.md) to allow project directories and start
+the server. [Installation](docs/installation.md) covers services and updates.
+
+### Build from source
 
 Requires Rust 1.89 or newer and a C compiler for SQLite.
 
@@ -58,7 +76,7 @@ cp -n preflight.example.toml preflight.toml
 Web: **http://127.0.0.1:4170** · MCP: **http://127.0.0.1:4170/mcp**
 
 [Server setup](docs/server-setup.md) covers allowed project directories, credentials,
-resource limits and autostart. Public curl/Homebrew packages are not published yet.
+resource limits and autostart.
 
 ## Define a pipeline
 
