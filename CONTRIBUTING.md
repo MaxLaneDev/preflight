@@ -1,7 +1,8 @@
 # Contributing
 
-Use Rust stable, a C compiler and Python 3.9+. Node.js 22 is needed for client tests
-and editor development, not for running a release.
+Use Rust stable and a C compiler. Shell checks need `jq`, `curl`, `git` and `unzip`.
+Browser tests and editor development use Node.js 26.13.0. Installed releases need
+neither Node.js nor Python.
 
 ```sh
 cargo fmt --all --check
@@ -9,7 +10,7 @@ cargo clippy --release --locked --workspace --all-targets -- -D warnings
 cargo test --release --locked --workspace
 cargo build --release --locked --workspace
 node --test crates/preflight-client/tests/*.test.mjs
-python3 scripts/test-release.py
+sh scripts/test-release.sh
 ```
 
 Tests that start servers need loopback networking. Use disposable project/data
@@ -23,7 +24,7 @@ module and Firefox executable:
 ```sh
 PF_PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
 PF_FIREFOX_EXECUTABLE=/absolute/path/to/firefox \
-python3 scripts/test-client.py --bundled
+sh scripts/test-client.sh --bundled
 ```
 
 Omit `--bundled` to check the standalone compatibility client. Each run creates
@@ -33,6 +34,22 @@ on completion or failure. The suite checks real builds, log history scrolling,
 source diffs, test sources, revisions, schedules, experiments and mobile navigation.
 It never uses the working server's database. Runtime-specific Docker and SSH
 acceptance remains separate.
+
+For real worker tests, select an already cached Linux ARM64 image. These tests
+start private loopback SSH daemons with temporary keys and remove their own
+containers. They do not change system SSH configuration.
+
+```sh
+PREFLIGHT_TEST_DOCKER_IMAGE=sha256:YOUR_CACHED_IMAGE_DIGEST \
+cargo test --release --locked --test containers --test remote_containers \
+  --test worker_connections -- --ignored --test-threads=1
+```
+
+On macOS, test a temporary launchd worker agent:
+
+```sh
+cargo test --release --locked --test worker_service -- --ignored --test-threads=1
+```
 
 Keep engine behavior shared by MCP and HTTP. Add regression coverage where a change
 can lose data, weaken permissions or change a protocol contract. Store new project
