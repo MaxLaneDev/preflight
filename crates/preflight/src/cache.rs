@@ -45,16 +45,33 @@ fn provenance(value: &serde_json::Value) -> serde_json::Value {
     }
     result.into()
 }
-pub fn key(db: &Db, run: &str, evidence: &crate::stage_keys::Evidence) -> Result<String> {
-    let source = db
+fn source_provenance(db: &Db, run: &str) -> Result<Option<serde_json::Value>> {
+    Ok(db
         .inputs(run)?
         .and_then(|v| v.source)
-        .map(|v| provenance(&v));
+        .map(|v| provenance(&v)))
+}
+pub fn key(db: &Db, run: &str, evidence: &crate::stage_keys::Evidence) -> Result<String> {
+    let source = source_provenance(db, run)?;
     Ok(crate::hashing::hex(Sha256::digest(serde_json::to_vec(&(
         FORMAT,
         &evidence.sha256,
         source,
     ))?)))
+}
+pub(crate) fn explain_key(
+    db: &Db,
+    run: &str,
+    evidence: &crate::stage_keys::Evidence,
+) -> Result<serde_json::Value> {
+    let source = source_provenance(db, run)?;
+    let source_sha256 = crate::hashing::hex(Sha256::digest(serde_json::to_vec(&source)?));
+    Ok(serde_json::json!({
+        "format": FORMAT,
+        "key": key(db, run, evidence)?,
+        "components": {"stage_evidence": evidence.sha256, "source_provenance": source_sha256},
+        "reuse_authorized": false
+    }))
 }
 pub fn restore(
     db: &Db,

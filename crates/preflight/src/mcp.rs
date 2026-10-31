@@ -936,7 +936,7 @@ impl Mcp {
         result(self.engine.db.operations(&r.run_id))
     }
     #[tool(
-        description = "Explain persisted stage identity, optional authenticated remote runtime receipt, and changed component hashes against a baseline stage. Null evidence/receipt means unknown; these diagnostic keys never authorize cache reuse."
+        description = "Explain persisted stage and build-cache identities, including ordered source provenance, optional remote runtime receipt and changed component hashes against a baseline. Null evidence means unknown; diagnostic keys never authorize reuse."
     )]
     fn runs_stage_key(
         &self,

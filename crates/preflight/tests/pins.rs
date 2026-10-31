@@ -483,6 +483,200 @@ fn cache_status(f: &Fixture, run: &str) -> serde_json::Value {
     f.engine.db.cache_decisions(run).unwrap()["stages"][0]["decision"].clone()
 }
 #[tokio::test]
+async fn cache_explains_different_patches_with_identical_final_source_bytes() {
+    use preflight::sources::{GitSource, Patch, SourceRequest};
+    let f = Fixture::new();
+    let profile = setup(&f);
+    std::fs::write(f.project.root.join("note.txt"), "base\n").unwrap();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&f.project.root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap()
+    };
+    git(&["init", "-q"]);
+    git(&["add", "."]);
+    git(&[
+        "-c",
+        "user.name=Preflight test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-qm",
+        "base",
+    ]);
+    let commit = git(&["rev-parse", "HEAD"]).trim().to_owned();
+    save(&f, "pinned", profile);
+    let patch = |before: &str, after: &str| Patch {
+        name: format!("{before}-to-{after}"),
+        diff: format!(
+            "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-{before}\n+{after}\n"
+        ),
+    };
+    let launch = |patches| {
+        profiles::start_pinned(
+            &f.engine,
+            StartPinned {
+                project_id: f.project.id.clone(),
+                definition: cached_definition(),
+                profile: Revision {
+                    name: "pinned".into(),
+                    revision: 1,
+                },
+                source: Some(SourceRequest::Git(GitSource {
+                    commit: commit.clone(),
+                    patches,
+                })),
+                idempotency_key: None,
+            },
+        )
+        .unwrap()
+    };
+    let first = launch(vec![patch("base", "final")]);
+    assert_eq!(
+        finished(&f.engine, &first.id).await.status,
+        RunState::Succeeded
+    );
+    let second = launch(vec![patch("base", "middle"), patch("middle", "final")]);
+    assert_eq!(
+        finished(&f.engine, &second.id).await.status,
+        RunState::Succeeded
+    );
+    assert_eq!(cache_status(&f, &first.id)["status"], "miss");
+    assert_eq!(cache_status(&f, &second.id)["status"], "miss");
+    let explanation = preflight::stage_keys::explain(
+        &f.engine.db,
+        &preflight::stage_keys::Query {
+            run_id: second.id.clone(),
+            stage_id: "work".into(),
+            baseline_id: Some(first.id.clone()),
+        },
+    )
+    .unwrap();
+    assert_eq!(explanation["changed_components"], json!([]));
+    assert_eq!(
+        explanation["changed_cache_components"],
+        json!(["source_provenance"])
+    );
+    assert_eq!(
+        explanation["build_cache_identity"]["key"],
+        cache_status(&f, &second.id)["key"]
+    );
+    assert_eq!(
+        explanation["baseline_build_cache_identity"]["key"],
+        cache_status(&f, &first.id)["key"]
+    );
+    assert_eq!(
+        explanation["build_cache_identity"]["reuse_authorized"],
+        false
+    );
+    let third = launch(vec![patch("base", "middle"), patch("middle", "final")]);
+    assert_eq!(
+        finished(&f.engine, &third.id).await.status,
+        RunState::Succeeded
+    );
+    assert_eq!(cache_status(&f, &third.id)["status"], "hit");
+    assert_eq!(cache_status(&f, &third.id)["producer_run"], second.id);
+    assert!(
+        !serde_json::to_string(&explanation)
+            .unwrap()
+            .contains(f.project.root.to_str().unwrap())
+    );
+    let db =
+        rusqlite::Connection::open(f.engine.config.data_dir.join("preflight.sqlite3")).unwrap();
+    db.execute("DELETE FROM stage_keys WHERE run_id=?1", [&third.id])
+        .unwrap();
+    let missing = preflight::stage_keys::explain(
+        &f.engine.db,
+        &preflight::stage_keys::Query {
+            run_id: third.id,
+            stage_id: "work".into(),
+            baseline_id: Some(first.id),
+        },
+    )
+    .unwrap();
+    assert!(missing["build_cache_identity"].is_null());
+    assert!(missing["changed_cache_components"].is_null());
+    assert_eq!(
+        std::fs::read_to_string(f.project.root.join("note.txt")).unwrap(),
+        "base\n"
+    );
+}
+#[tokio::test]
+async fn cache_identity_separates_command_environment_and_target_contract() {
+    let f = Fixture::new();
+    let profile = setup(&f);
+    save(&f, "pinned", profile.clone());
+    let baseline = start(&f, "pinned", cached_definition());
+    assert_eq!(
+        finished(&f.engine, &baseline.id).await.status,
+        RunState::Succeeded
+    );
+    let mut target = profile;
+    target.pins.as_mut().unwrap().target = "another-target".into();
+    save(&f, "another", target);
+    let mut command = cached_definition();
+    command.pipeline.stages[0]
+        .command
+        .args
+        .push("changed-flag".into());
+    let mut environment = cached_definition();
+    environment.pipeline.stages[0]
+        .env
+        .insert("BUILD_MODE".into(), "release".into());
+    for (profile, file, component) in [
+        ("pinned", command, "stage"),
+        ("pinned", environment, "stage"),
+        ("another", cached_definition(), "toolchain"),
+    ] {
+        let run = start(&f, profile, file.clone());
+        assert_eq!(
+            finished(&f.engine, &run.id).await.status,
+            RunState::Succeeded
+        );
+        assert_eq!(cache_status(&f, &run.id)["status"], "miss");
+        let explanation = preflight::stage_keys::explain(
+            &f.engine.db,
+            &preflight::stage_keys::Query {
+                run_id: run.id.clone(),
+                stage_id: "work".into(),
+                baseline_id: Some(baseline.id.clone()),
+            },
+        )
+        .unwrap();
+        assert!(
+            explanation["changed_components"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(component)),
+            "{explanation}"
+        );
+        assert_eq!(
+            explanation["changed_cache_components"],
+            json!(["stage_evidence"])
+        );
+        assert_ne!(
+            cache_status(&f, &run.id)["key"],
+            cache_status(&f, &baseline.id)["key"]
+        );
+        let repeated = start(&f, profile, file);
+        assert_eq!(
+            finished(&f.engine, &repeated.id).await.status,
+            RunState::Succeeded
+        );
+        assert_eq!(cache_status(&f, &repeated.id)["status"], "hit");
+        assert_eq!(cache_status(&f, &repeated.id)["producer_run"], run.id);
+    }
+}
+#[tokio::test]
 async fn cache_rejects_ambient_path_launchers_even_with_an_unrelated_pinned_profile() {
     let f = Fixture::new();
     save(&f, "locked", setup(&f));

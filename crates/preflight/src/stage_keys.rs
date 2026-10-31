@@ -100,7 +100,11 @@ pub fn capture(db: &Db, id: &str, stage: &StageDefinition) -> Result<Evidence> {
 }
 pub fn explain(db: &Db, query: &Query) -> Result<Value> {
     let current = db.stage_key(&query.run_id, &query.stage_id)?;
-    let mut result = json!({"run_id":query.run_id,"stage_id":query.stage_id,"evidence":current});
+    let cache_identity = current
+        .as_ref()
+        .map(|e| crate::cache::explain_key(db, &query.run_id, e))
+        .transpose()?;
+    let mut result = json!({"run_id":query.run_id,"stage_id":query.stage_id,"evidence":current,"build_cache_identity":cache_identity});
     use rusqlite::OptionalExtension;
     let remote:Option<(String,String,u64,Option<String>)>=db.connection()?.query_row("SELECT state,worker_id,generation,result_json FROM worker_jobs WHERE run_id=?1 AND stage_id=?2",rusqlite::params![query.run_id,query.stage_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
     if let Some((state, worker, generation, outcome)) = remote {
@@ -115,6 +119,19 @@ pub fn explain(db: &Db, query: &Query) -> Result<Value> {
             crate::model::invalid("runs must belong to the same project")
         );
         let previous = db.stage_key(baseline, &query.stage_id)?;
+        let previous_cache = previous
+            .as_ref()
+            .map(|e| crate::cache::explain_key(db, baseline, e))
+            .transpose()?;
+        let cache_changed = match (&cache_identity, &previous_cache) {
+            (Some(a), Some(b)) if a["format"] == b["format"] => Some(
+                ["stage_evidence", "source_provenance"]
+                    .into_iter()
+                    .filter(|k| a["components"][*k] != b["components"][*k])
+                    .collect::<Vec<_>>(),
+            ),
+            _ => None,
+        };
         let changed = match (&current, &previous) {
             (Some(a), Some(b)) if a.format == b.format => Some(
                 a.components
@@ -131,6 +148,8 @@ pub fn explain(db: &Db, query: &Query) -> Result<Value> {
         result["baseline_id"] = json!(baseline);
         result["baseline"] = json!(previous);
         result["changed_components"] = json!(changed);
+        result["baseline_build_cache_identity"] = json!(previous_cache);
+        result["changed_cache_components"] = json!(cache_changed);
     }
     Ok(result)
 }

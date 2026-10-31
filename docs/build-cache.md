@@ -38,6 +38,14 @@ Keys include captured inputs, configuration, pinned toolchain/SDK/target, host a
 artifacts. A diagnostic identity alone never grants cache reuse. Undeclared files,
 network state or dynamic libraries must be covered by the author's contract.
 
+From protocol 1.72, `runs_stage_key` also returns `build_cache_identity` and, with a
+baseline, `changed_cache_components`. For example, a direct patch and two ordered
+patches can produce identical files: `changed_components` is empty, while
+`changed_cache_components` contains `source_provenance`. Their cache keys differ.
+Repeating the same patch sequence can hit the cache. Identity fields remain
+diagnostic (`reuse_authorized: false`); `runs_cache` records the actual decision.
+Missing stage evidence produces null identity and comparison fields.
+
 ## Sharing concurrent build execution
 
 Add `single_flight: true` to the cache policy. Identical eligible requests share

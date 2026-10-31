@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 pub const PROTOCOL_MAJOR: u32 = 1;
-pub const PROTOCOL_MINOR: u32 = 71;
+pub const PROTOCOL_MINOR: u32 = 72;
 pub const PROTOCOL_PATCH: u32 = 0;
-pub const PROTOCOL_VERSION: &str = "1.71.0";
+pub const PROTOCOL_VERSION: &str = "1.72.0";
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectId {
@@ -47,6 +47,7 @@ pub fn validate_name(name: &str) -> Result<()> {
 pub fn capabilities(e: &Engine) -> Value {
     let config = e.current_config();
     let mut features = json!({"dag":true,"durable_completion_events":true,"completion_resource_subscriptions":true,"weighted_stage_slots":true,"os_resource_isolation":false,"fixtures":true,"junit":true,"remote_workers":false,"toolchain_profiles":true,"toolchain_binary_pinning":true,"sdk_tree_pinning":true,"toolchain_identity_format":crate::pins::FORMAT,"git_snapshots":true,"git_source_modes":["exact_local_commit","checked_working_tree","multi_repository"],"git_dirty_snapshots":true,"multi_repository_sources":true,"multi_source_format":crate::multi_source::FORMAT,"ordered_text_patches":true,"git_mr_sources":false,"git_source_format":crate::sources::SOURCE_FORMAT,"prepared_file_modules":true,"module_directory_trees":true,"module_tree_format":crate::trees::FORMAT,"module_compatibility_verification":true,"module_compatibility_policy":"exact pinned profile or container contract; legacy requires legacy publication","input_manifests":true,"input_comparison":true,"stage_key_evidence":true,"stage_key_format":crate::stage_keys::FORMAT,"operation_leases":true,"operation_lease_policy":"local exclusive owner; no expiry","cache":true,"cache_format":crate::cache::FORMAT,"cache_policy":"explicit deterministic complete-input pinned build stages only","scoped_cache_cleanup":true,"cache_cleanup_modes":["invalidate_entries"],"physical_cache_deletion":true,"idempotent_start":true,"idempotent_operations":["pipeline_run_saved","toolchain_probe","pipeline_start_pinned"]});
+    features["cache_key_explanations"] = true.into();
     features["stage_retry"] = true.into();
     features["fixture_case_retry"] = true.into();
     features["configured_test_retry"] = true.into();

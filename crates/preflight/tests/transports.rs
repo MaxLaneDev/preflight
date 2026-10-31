@@ -1056,6 +1056,15 @@ async fn mcp_http_sdk_handshake_and_vertical_slice() {
     assert_ne!(response.is_error, Some(true));
     let key: Value = serde_json::from_str(&response.content[0].as_text().unwrap().text).unwrap();
     assert_eq!(key["evidence"]["reusable"], false);
+    assert_eq!(
+        key["build_cache_identity"]["format"],
+        "preflight-build-cache-v1"
+    );
+    assert_eq!(key["build_cache_identity"]["reuse_authorized"], false);
+    assert_eq!(
+        key["build_cache_identity"]["components"]["stage_evidence"],
+        key["evidence"]["sha256"]
+    );
     let (status, rest) = request(
         &f,
         "GET",

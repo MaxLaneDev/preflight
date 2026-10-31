@@ -27,3 +27,5 @@ native commands.
 MCP transport version, Preflight tool contract and database migration versions are
 independent. Migrations are contiguous, checksummed and transactional; future
 schemas are rejected. [Recovery](operation-recovery.md) · [Backup](server-backup.md).
+
+[Cache identity decision](adr/0001-cache-key-explanation.md).
