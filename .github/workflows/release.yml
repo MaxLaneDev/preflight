@@ -23,10 +23,14 @@ jobs:
       - name: Verify release files and generate checksums
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python3 scripts/release-files.py artifacts release-assets "$RELEASE_TAG"
+        run: |
+          mkdir -p .validation
+          archive=$(find artifacts -name '*-linux-aarch64.tar.gz')
+          sh scripts/lib/extract-release-binary.sh "$archive" .validation/preflight
+          PREFLIGHT_BINARY="$PWD/.validation/preflight" sh scripts/release-files.sh artifacts release-assets "$RELEASE_TAG"
       - name: Create reviewable draft
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.py release-assets/SHA256SUMS
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.sh release-assets/SHA256SUMS

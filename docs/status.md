@@ -7,6 +7,7 @@
 | Bundled UI and compatibility client | Browser acceptance, including mobile viewports |
 | SSH and Docker workers | Same-machine real transport/container tests |
 | Crash recovery | Owned-worker SIGKILL and explicit journal recovery |
+| Shell scripts / distribution | Python-free bootstrap and hooks; Rust package verification and rollback |
 | Public releases / Homebrew | Not published |
 | Public plugin directory | Not submitted; eligibility/review pending |
 
@@ -16,5 +17,5 @@ NAT traversal remains future work. Local check receipts stay outside the public 
 ```sh
 cargo test --release --locked --workspace
 node --test crates/preflight-client/tests/*.test.mjs
-python3 scripts/test-release.py
+sh scripts/test-release.sh
 ```

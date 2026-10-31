@@ -16,19 +16,18 @@ brew services start MaxLaneDev/preflight/preflight
 ```
 
 The first release targets macOS ARM64 and Linux ARM64; the Homebrew formula targets
-macOS ARM64. The installer requires Python 3.9+ and does not start the server.
+macOS ARM64. The installer needs curl, tar and a SHA-256 tool; it does not start the server.
 
 ## Install a local release package
 
 ```sh
-python3 scripts/release.py package --server target/release/preflight --destination dist
-python3 dist/install-preflight.py install dist/ARCHIVE.tar.gz \
+sh scripts/release.sh package --server target/release/preflight --destination dist
+sh dist/install-preflight.sh install dist/ARCHIVE.tar.gz \
   --sha256 ARCHIVE_SHA256 --prefix /path/to/binaries \
   --config /path/to/config/preflight.toml --data /path/to/data
 ```
 
-Use the generated archive name and its `.sha256` digest. Python ≥ 3.9 is needed
-for installation, not for the server. Configuration and data must be outside the
+Use the generated archive name and its `.sha256` digest. No Python runtime is required. Configuration and data must be outside the
 binary directory. The installer creates a private admin-token file for a new config.
 It prints the start command and never restarts a running service.
 
@@ -37,9 +36,9 @@ It prints the start command and never restarts a running service.
 Run `install` with a new archive and checksum to update. Restart after active work finishes.
 
 ```sh
-python3 install-preflight.py status --prefix /path/to/binaries
-python3 install-preflight.py rollback --prefix /path/to/binaries
-python3 install-preflight.py uninstall --prefix /path/to/binaries
+sh install-preflight.sh status --prefix /path/to/binaries
+sh install-preflight.sh rollback --prefix /path/to/binaries
+sh install-preflight.sh uninstall --prefix /path/to/binaries
 ```
 
 Stop the service before uninstalling. Configuration and data remain on disk.

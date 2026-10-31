@@ -7,11 +7,11 @@ Homebrew tap are pending release acceptance.
 
 ```sh
 cargo build --release --locked --workspace
-python3 scripts/test-release.py
-python3 scripts/test-install-sh.py
-python3 scripts/test-codex-plugin.py
-python3 scripts/release.py package --server target/release/preflight --destination dist
-python3 scripts/smoke-package.py dist
+sh scripts/test-release.sh
+sh scripts/test-install-sh.sh
+sh scripts/test-codex-plugin.sh
+sh scripts/release.sh package --server target/release/preflight --destination dist
+sh scripts/smoke-package.sh dist
 ```
 
 CI checks macOS/Linux ARM64. Windows and x86_64 remain deferred. A release tag must
@@ -21,7 +21,7 @@ installer, plugin ZIP and SHA256SUMS. Publish only after real download/install c
 ## Homebrew
 
 ```sh
-python3 scripts/release.py formula ARCHIVE --sha256 SHA256 \
+sh scripts/release.sh formula ARCHIVE --sha256 SHA256 \
   --url HTTPS_RELEASE_ASSET_URL --homepage HTTPS_REPOSITORY_URL \
   --destination preflight.rb
 ```
@@ -48,3 +48,20 @@ six hours without a token. The update icon opens a plaintext changelog. Product
 SemVer is separate from MCP protocol. `server_release_status` reads compact status;
 `details: true` includes notes. Admin-only `server_release_check` is throttled to
 once per minute. No binaries are automatically installed and no runs are stopped.
+
+## Script dependencies
+
+Installation and Codex hooks need no Python or Node.js. Package verification,
+activation and rollback run in the Rust CLI.
+
+Development commands use `sh`, Node.js 22, `jq`, `git` and `unzip`; archive
+acceptance also uses the `sqlite3` CLI. Browser checks retain their Node.js runner.
+macOS service and disk-image checks require a real user session.
+
+```sh
+PREFLIGHT_BINARY="$PWD/target/release/preflight" sh scripts/test-install-sh.sh
+sh scripts/test-release.sh
+sh scripts/test-codex-plugin.sh
+sh scripts/test-public-export.sh
+sh scripts/accept-environment.sh
+```

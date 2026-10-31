@@ -3,6 +3,7 @@ pub mod artifacts;
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod distribution;
 pub mod docker;
 pub mod engine;
 pub mod executor;

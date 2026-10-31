@@ -258,7 +258,8 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
 pub fn is_asset(path: &str) -> bool {
     matches!(
         path,
-        "/environment-editor.mjs"
+        "/releases.mjs"
+            | "/environment-editor.mjs"
             | "/favicon-32.png"
             | "/apple-touch-icon.png"
             | "/live-worker.js"

@@ -24,8 +24,10 @@ jobs:
           latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
           if [ "$latest" != "$RELEASE_TAG" ]; then exit 0; fi
           mkdir -p .validation/homebrew-release Formula
-          gh release download "$RELEASE_TAG" --pattern '*-macos-aarch64.tar.gz' --pattern SHA256SUMS --dir .validation/homebrew-release
-          python3 scripts/homebrew-release.py .validation/homebrew-release "$RELEASE_TAG" .validation/preflight.rb
+          gh release download "$RELEASE_TAG" --pattern '*-macos-aarch64.tar.gz' --pattern '*-linux-aarch64.tar.gz' --pattern '*-linux-aarch64.tar.gz.sha256' --pattern SHA256SUMS --dir .validation/homebrew-release
+          archive=$(find .validation/homebrew-release -name '*-linux-aarch64.tar.gz')
+          sh scripts/lib/extract-release-binary.sh "$archive" .validation/homebrew-verifier
+          PREFLIGHT_BINARY="$PWD/.validation/homebrew-verifier" sh scripts/homebrew-release.sh .validation/homebrew-release "$RELEASE_TAG" .validation/preflight.rb
           cp .validation/preflight.rb Formula/preflight.rb
           git add Formula/preflight.rb
           if git diff --cached --quiet; then exit 0; fi

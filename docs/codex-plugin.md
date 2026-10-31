@@ -6,7 +6,7 @@ Install/start the [server](server-setup.md) first. The plugin does not include i
 ## Build a local marketplace
 
 ```sh
-python3 scripts/package-codex-plugin.py output/preflight-plugin
+sh scripts/package-codex-plugin.sh output/preflight-plugin
 codex plugin marketplace add "$PWD/output/preflight-plugin" --json
 codex plugin add preflight@preflight-local --json
 ```
@@ -17,8 +17,8 @@ configure the same MCP endpoint as a standalone connection.
 ## Make a distributable ZIP
 
 ```sh
-python3 scripts/package-codex-plugin.py output/preflight-plugin.zip --zip
-python3 scripts/test-codex-plugin.py
+sh scripts/package-codex-plugin.sh output/preflight-plugin.zip --zip
+sh scripts/test-codex-plugin.sh
 ```
 
 Optional native hooks require Python 3. Review/trust each hook in Codex's hooks UI.

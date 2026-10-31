@@ -169,6 +169,30 @@ async fn actual_roles_sessions_cli_reload_redaction_and_audit_share_one_boundary
     ] {
         assert_eq!(server.response(asset, None, None).await.status(), 200);
     }
+    // Every eager module must load before the browser can ask for credentials.
+    let imports = regex::Regex::new(r#"from\s*['"](/[^'"]+\.mjs)['"]"#).unwrap();
+    let mut pending = vec!["/app.js".to_owned()];
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(asset) = pending.pop() {
+        if !seen.insert(asset.clone()) {
+            continue;
+        }
+        assert!(
+            preflight_client::is_asset(&asset),
+            "module is not public: {asset}"
+        );
+        let response = server.response(&asset, None, None).await;
+        assert_eq!(response.status(), 200, "anonymous module load: {asset}");
+        assert!(
+            response.headers()["content-type"]
+                .to_str()
+                .unwrap()
+                .contains("javascript")
+        );
+        let source = response.text().await.unwrap();
+        pending.extend(imports.captures_iter(&source).map(|c| c[1].to_owned()));
+    }
+    assert!(seen.contains("/releases.mjs"));
     let login = server
         .response("/api/v1/browser-session", Some(json!({})), Some(&read))
         .await;

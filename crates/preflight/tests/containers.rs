@@ -316,22 +316,7 @@ fn fake_runtime() -> (tempfile::TempDir, PathBuf) {
     use std::os::unix::fs::PermissionsExt;
     let temp = tempfile::tempdir().unwrap();
     let script = temp.path().join("docker");
-    let python = std::process::Command::new("python3")
-        .args(["-c", "import sys; print(sys.executable)"])
-        .output()
-        .unwrap();
-    assert!(python.status.success());
-    let source = include_str!("support/docker.py");
-    let (_, body) = source.split_once('\n').unwrap();
-    std::fs::write(
-        &script,
-        format!(
-            "#!{}\n{}",
-            String::from_utf8(python.stdout).unwrap().trim(),
-            body
-        ),
-    )
-    .unwrap();
+    std::fs::write(&script, include_str!("support/docker.sh")).unwrap();
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
     (temp, script)
 }

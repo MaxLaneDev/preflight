@@ -1,6 +1,6 @@
 {
   "name": "preflight",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local builds, change queues and compact results through Preflight MCP",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
