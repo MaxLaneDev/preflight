@@ -7,7 +7,7 @@
 | Bundled UI and compatibility client | Browser acceptance, including mobile viewports |
 | SSH and Docker workers | Same-machine real transport/container tests |
 | Crash recovery | Owned-worker SIGKILL and explicit journal recovery |
-| Shell scripts / distribution | Python-free bootstrap and hooks; Rust package verification and rollback |
+| Shell scripts / distribution | Shell/Rust install, release and MCP checks pass with Node blocked; browser tests retain Node |
 | Public releases / Homebrew | Not published |
 | Public plugin directory | Not submitted; eligibility/review pending |
 

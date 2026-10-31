@@ -7,7 +7,7 @@ The embedded editor's notices come from its pinned package lock and bundle diges
 Regenerate them after changing editor dependencies:
 
 ```sh
-node scripts/client-notices.mjs
+sh scripts/client-notices.sh
 ```
 
 The release packager checks notice fingerprints before shipping. Dependencies

@@ -372,6 +372,16 @@ pub(super) async fn run(operation: &str, mut args: Args) -> Result<Value> {
         .map(PathBuf::from)
         .unwrap_or(std::env::current_dir()?);
     match operation {
+        "export" => {
+            let destination = PathBuf::from(args.one()?);
+            args.finish()?;
+            super::export::export(&root, &destination)
+        }
+        "free-port" => {
+            args.finish()?;
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
+            Ok(json!(listener.local_addr()?.port()))
+        }
         "create" => {
             let server = args.path("--server")?;
             let client = args.options.remove("--client").map(PathBuf::from);

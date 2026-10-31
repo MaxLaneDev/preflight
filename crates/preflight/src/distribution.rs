@@ -1,4 +1,5 @@
 //! Distribution entry points. Shell launchers share the server's package verifier.
+mod export;
 mod installer;
 mod tooling;
 

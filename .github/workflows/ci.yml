@@ -47,19 +47,13 @@ jobs:
         shell: bash
       - run: sh scripts/test-script-entrypoints.sh
         shell: bash
-      - run: sh scripts/test-install-sh.sh
-        if: runner.os != 'Windows'
-      - run: sh scripts/test-codex-plugin.sh
-      - run: sh scripts/test-public-export.sh
-      - run: sh scripts/test-release.sh
-        if: runner.os != 'Windows'
       - name: Package server with required Web UI and MCP
         shell: bash
         run: |
           suffix=""
           if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
           sh scripts/release.sh package --server "target/release/preflight$suffix" --destination dist
-      - run: sh scripts/smoke-package.sh dist
+      - run: sh scripts/test-without-node.sh dist
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: preflight-${{ matrix.os }}

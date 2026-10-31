@@ -7,7 +7,7 @@ export PREFLIGHT_BINARY="$preflight_binary"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' 0; trap 'exit 1' HUP INT TERM
 printf '{"hook_event_name":"SessionStart"}' | "$preflight_binary" codex-hook | jq -e '.hookSpecificOutput.hookEventName=="SessionStart" and (.hookSpecificOutput.additionalContext|contains("preflight-mcp"))' >/dev/null
 for raw in bad '[]' null '{}' '{"hook_event_name":"Stop"}'; do [ -z "$(printf '%s' "$raw" | "$preflight_binary" codex-hook)" ]; done
-node -e 'process.stdout.write("x".repeat(65537))' | "$preflight_binary" codex-hook > "$tmp/oversize"
+awk 'BEGIN {for(i=0;i<65537;i++)printf "x"}' | "$preflight_binary" codex-hook > "$tmp/oversize"
 [ ! -s "$tmp/oversize" ]
 "$root/scripts/package-codex-plugin.sh" "$tmp/plugin.zip" --zip >/dev/null
 unzip -Z1 "$tmp/plugin.zip" > "$tmp/names"

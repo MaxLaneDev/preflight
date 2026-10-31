@@ -54,14 +54,14 @@ once per minute. No binaries are automatically installed and no runs are stopped
 Installation and Codex hooks need no Python or Node.js. Package verification,
 activation and rollback run in the Rust CLI.
 
-Development commands use `sh`, Node.js 22, `jq`, `git` and `unzip`; archive
-acceptance also uses the `sqlite3` CLI. Browser checks retain their Node.js runner.
-macOS service and disk-image checks require a real user session.
+Service/release checks use shell, `curl`, `jq`, `git` and `unzip`. Archive checks
+also use the `sqlite3` CLI. Browser tests and editor rebuilds use Node.js 22;
+macOS service checks require a user session.
 
 ```sh
-PREFLIGHT_BINARY="$PWD/target/release/preflight" sh scripts/test-install-sh.sh
-sh scripts/test-release.sh
-sh scripts/test-codex-plugin.sh
-sh scripts/test-public-export.sh
-sh scripts/accept-environment.sh
+sh scripts/release.sh package --server target/release/preflight --destination dist
+sh scripts/test-without-node.sh dist
 ```
+
+The second command blocks Node execution while checking licenses, bootstrap,
+plugin packaging, source export, release collection, server startup and MCP.

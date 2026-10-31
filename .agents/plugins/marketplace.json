@@ -1,20 +1,20 @@
 {
-  "name": "preflight",
   "interface": {
     "displayName": "Preflight"
   },
+  "name": "preflight",
   "plugins": [
     {
+      "category": "Productivity",
       "name": "preflight",
-      "source": {
-        "source": "local",
-        "path": "./integrations/codex"
-      },
       "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
       },
-      "category": "Productivity"
+      "source": {
+        "path": "./integrations/codex",
+        "source": "local"
+      }
     }
   ]
 }

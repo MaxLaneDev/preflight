@@ -13,6 +13,9 @@ preflight_binary=$out/binary/current/preflight
 start_server
 for path in / /app.js /app.css /projects/example/pipelines /executions; do request "$path" > /dev/null; done
 api capabilities | jq -e '.features.bundled_web_ui' >/dev/null
+printf '{"tool":"server_capabilities","args":{}}\n' > "$out/mcp-request.json"
+"$root/scripts/mcp-call.sh" "$base/mcp" "$out/mcp-request.json" > "$out/mcp-response.json"
+jq -e '.features.bundled_web_ui' "$out/mcp-response.json" >/dev/null
 code=$(curl --noproxy '*' -sS --max-time 10 -o "$out/denied.json" -w '%{http_code}' -H 'Content-Type: application/json' --data "$(jq -n --arg path "$project" '{name:"denied",path:$path}')" "$base/api/v1/projects")
 [ "$code" = 400 ]
 stop_server

@@ -1,7 +1,6 @@
 # Isolated acceptance fixtures; source after setting root and scenario.
 . "$root/scripts/lib/common.sh"
 require_jq
-command -v node >/dev/null
 umask 077
 mkdir -p "$root/.validation"
 out=$(mktemp -d "$root/.validation/$scenario-XXXXXXXX")
@@ -21,7 +20,7 @@ cleanup() {
 }
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
-free_port() { node --input-type=module -e 'import net from "node:net"; const s=net.createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()});'; }
+free_port() { "$preflight_binary" package free-port; }
 port=$(free_port); base=http://127.0.0.1:$port
 json_string() { jq -Rn --arg value "$1" '$value'; }
 write_config() {
@@ -58,4 +57,3 @@ start_client() {
  client_port=$(free_port); client=http://127.0.0.1:$client_port
  "${PREFLIGHT_CLIENT_BINARY:-$root/target/release/preflight-client}" --server "$base" --bind "127.0.0.1:$client_port" >> "$out/client.log" 2>&1 & client_pid=$!; pids="$client_pid $pids"; ready "$client_pid" "$client"
 }
-browser() { node "$root/scripts/lib/run-bounded.mjs" "${BROWSER_TIMEOUT:-180}" "$out/browser.log" node "$root/scripts/$1" "$out/fixture.json" "$out"; }

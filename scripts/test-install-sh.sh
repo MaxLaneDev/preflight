@@ -9,7 +9,7 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' 0; trap 'exit 1' HUP INT TERM
 mkdir "$tmp/bin" "$tmp/assets" "$tmp/payload"
 cat > "$tmp/payload/preflight" <<'PAYLOAD'
 #!/bin/sh
-node -e 'console.log(JSON.stringify(process.argv.slice(1)))' -- "$@"
+jq -n --args '$ARGS.positional' -- "$@"
 PAYLOAD
 tar -czf "$tmp/assets/preflight-0.1.0-macos-aarch64.tar.gz" -C "$tmp/payload" preflight
 sha=$(sha256 "$tmp/assets/preflight-0.1.0-macos-aarch64.tar.gz")
