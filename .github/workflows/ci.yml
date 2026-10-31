@@ -30,13 +30,14 @@ jobs:
     env:
       CARGO_INCREMENTAL: '0'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: rustfmt, clippy
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '26.13.0'
+          package-manager-cache: false
       - run: jq --version
         shell: bash
       - run: cargo fmt --all --check
@@ -54,7 +55,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
           sh scripts/release.sh package --server "target/release/preflight$suffix" --destination dist
       - run: sh scripts/test-without-node.sh dist
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: preflight-${{ matrix.os }}
           path: dist/

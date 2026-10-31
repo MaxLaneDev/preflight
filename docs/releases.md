@@ -55,7 +55,7 @@ Installation and Codex hooks need no Python or Node.js. Package verification,
 activation and rollback run in the Rust CLI.
 
 Service/release checks use shell, `curl`, `jq`, `git` and `unzip`. Archive checks
-also use the `sqlite3` CLI. Browser tests and editor rebuilds use Node.js 22;
+also use the `sqlite3` CLI. Browser tests and editor rebuilds use Node.js 26.13.0;
 macOS service checks require a user session.
 
 ```sh
