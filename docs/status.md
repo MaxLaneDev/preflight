@@ -4,7 +4,7 @@
 | --- | --- |
 | Local engine, MCP/HTTP, cache, retention, archives | Rust regression suite |
 | Crate updates | Rust 1.89 compilation; database, backup and age compatibility |
-| Bundled UI and compatibility client | Browser acceptance, including mobile viewports |
+| Bundled UI and compatibility client | Headless Firefox in both modes, 390 px mobile navigation; 40 frontend tests |
 | SSH and Docker workers | 14 opt-in checks with loopback OpenSSH and Linux ARM64 Docker |
 | Worker service | macOS launchd restart, identity retention and state-lock release |
 | Crash recovery | Owned-worker SIGKILL and explicit journal recovery |

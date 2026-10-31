@@ -158,7 +158,14 @@ await choose(page.locator('#projects'),{label:'Project Patch'});await page.locat
   const previous=await page.locator('#run-picker option').nth(1).getAttribute('value');await choose(page.locator('#run-picker'),previous);await page.locator('#run-title').getByText('Run '+previous.slice(-8),{exact:true}).waitFor();
   await choose(page.locator('#projects'),{label:'Project B'});await page.locator('#pipelines button',{hasText:'test-suite'}).click();
   await page.locator('#tabs').getByRole('tab',{name:'Graph',exact:true}).click();await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:process.env.PF_EVIDENCE+'/graph.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:process.env.PF_EVIDENCE+'/mobile.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));
+  await page.locator('#sidebar').waitFor({state:'hidden'});
+  await page.locator('#sidebar-toggle').click();
+  await page.locator('#sidebar').waitFor({state:'visible'});
+  await page.screenshot({path:process.env.PF_EVIDENCE+'/mobile-navigation.png',fullPage:true,animations:'disabled'});
+  if(!await page.locator('#sidebar').evaluate(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;}))throw Error('Mobile navigation leaves the viewport');
+  await page.locator('#sidebar-toggle').click();await page.locator('#sidebar').waitFor({state:'hidden'});
+  await page.screenshot({path:process.env.PF_EVIDENCE+'/mobile.png',fullPage:true});
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Mobile page overflows horizontally');
   await page.setViewportSize({width:1440,height:1000});
 
