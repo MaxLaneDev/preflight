@@ -51,6 +51,13 @@ On macOS, test a temporary launchd worker agent:
 cargo test --release --locked --test worker_service -- --ignored --test-threads=1
 ```
 
+On macOS, test full-disk recovery on an owned 64 MiB image and scoped cleanup
+under a free-space watermark. The script detaches and removes its image afterward.
+
+```sh
+sh scripts/accept-storage-volume.sh
+```
+
 Keep engine behavior shared by MCP and HTTP. Add regression coverage where a change
 can lose data, weaken permissions or change a protocol contract. Store new project
 configuration in `.preflight/`, never in a language-specific global mode.

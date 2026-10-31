@@ -43,6 +43,7 @@ const SCRIPTS: &[&str] = &[
     "test-client.cjs",
     "test-launchd.sh",
     "accept-homebrew.sh",
+    "accept-storage-volume.sh",
     "export-public-source.sh",
     "test-public-export.sh",
     "homebrew-release.sh",

@@ -8,6 +8,7 @@
 | SSH and Docker workers | 14 opt-in checks with loopback OpenSSH and Linux ARM64 Docker |
 | Worker service | macOS launchd restart, identity retention and state-lock release |
 | Crash recovery | Owned-worker SIGKILL and explicit journal recovery |
+| Disk pressure | ENOSPC recovery on an owned 64 MiB HFS+ image; scoped watermark cleanup |
 | Shell scripts / distribution | Shell/Rust install, release and MCP checks pass with Node blocked; browser tests retain Node |
 | Public releases / Homebrew | v0.1.0 published; ARM64 CI, macOS curl/Homebrew installation and UI/MCP startup checked |
 | Public plugin directory | Not submitted; eligibility/review pending |
