@@ -51,7 +51,7 @@ accept `setup: [{program,args}]`; these literal POSIX commands share the main
 command's environment and timeout. Source an activation script with program `.`.
 Setup runs on the selected native worker or inside the stage's local container;
 SSH bootstrap itself still installs only the worker. Setup cannot use fixture
-adapters, cache reuse or pinned profiles. See docs/environment-setup.md.
+adapters, cache reuse or pinned profiles.
 
 For reusable container tools, a producer can run `docker build --iidfile image-id .`
 and publish image-id as a file output. A dependent local Docker stage uses

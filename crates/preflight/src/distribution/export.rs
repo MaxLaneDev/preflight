@@ -166,7 +166,7 @@ pub(super) fn export(root: &Path, destination: &Path) -> Result<Value> {
     write_new(
         &destination.join(".agents/plugins/marketplace.json"),
         &serde_json::to_vec_pretty(
-            &json!({"name":"preflight","interface":{"displayName":"Preflight"},"plugins":[{"name":"preflight","source":{"source":"local","path":"./integrations/codex"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"}]}),
+            &json!({"name":"preflight","interface":{"displayName":"Preflight"},"plugins":[{"name":"preflight","source":{"source":"local","path":"./integrations/codex"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Developer Tools"}]}),
         )?,
         0o644,
     )?;

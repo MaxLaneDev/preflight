@@ -101,7 +101,7 @@ For automatic retention status/configuration, read [storage policies](references
 
 From protocol 1.39, build_report omits repeated definitions/profile snapshots. Use runs_definition for recorded configuration, runs_toolchain for verified paths/contracts, and the bounded stage_failures log references. Original-path tools require explicit run_in_place with pins; private copies remain the default.
 
-For log investigation use evidence_search with project_id and optional run_id, stage_id, test_id, kind and stream. Keep log:ID references; evidence_read expands one reference, evidence_context returns bounded cited text. Read runs_acceptance for recorded criteria and verdicts. See ../../docs/evidence.md and ../../docs/test-reports.md in the source checkout. These are literal retrieval tools; do not infer absent test counts or semantic matches.
+For log investigation use evidence_search with project_id and optional run_id, stage_id, test_id, kind and stream. Keep log:ID references; evidence_read expands one reference, evidence_context returns bounded cited text. Read runs_acceptance for recorded criteria and verdicts. Read [evidence](references/evidence.md) for retrieval details. These are literal retrieval tools; do not infer absent test counts or semantic matches.
 
 For large navigation lists use catalog_list: kind=workspaces|pipelines|saved_pipelines|experiments, project_id when scoped, query, limit (default25/max100), after=returned next_cursor. Preserve the same filter while paging; fetch definition details only after choosing a returned name/revision.
 
@@ -120,7 +120,7 @@ succeeded; their declared outputs are SHA-verified modules. Current project file
 captured by default; use a new key for another edit. Native fixtures select a case ID;
 other runners need testing.rerun with a whole ${test.name} or ${test.id} argument and
 an actual complete single-case report. Never infer test counts or pretend the whole
-pipeline is now successful. See docs/retries.md for the contract and source limits.
+pipeline is now successful.
 
 Language policy (1.45.1): Preflight-owned descriptions, statuses, errors and hints
 are English-only, independent of client locale. Capabilities expose

@@ -9,6 +9,11 @@ Connect your client to `http://127.0.0.1:4170/mcp`.
 The [Codex plugin](codex-plugin.md) supplies this connection. Configure it once.
 If API tokens are enabled, configure Bearer authentication in the client; never put tokens in Git.
 
+Tool discovery includes explicit read-only, destructive and open-world hints.
+Mixed read/write tools such as server settings advertise their write effects.
+Cleanup previews persist plans; they are non-destructive writes. These hints do
+not authorize calls or replace server permissions and scope checks.
+
 ## Stdio clients (0.1.2+)
 
 Start the server first. A stdio client can launch a relay to that same backend:

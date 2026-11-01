@@ -5,19 +5,26 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      x86_64_only:
+        description: 'Check only Linux x86_64 and Windows x86_64'
+        type: boolean
+        default: false
       include_deferred:
         description: 'Also run currently deferred Windows/x86_64 targets'
         type: boolean
         default: false
   workflow_call:
     inputs:
+      x86_64_only:
+        type: boolean
+        default: false
       include_deferred:
         type: boolean
         default: false
 permissions:
   contents: read
 concurrency:
-  group: check-${{ github.workflow }}-${{ github.ref }}
+  group: check-${{ github.workflow }}-${{ github.ref }}-${{ inputs.x86_64_only && 'x86_64' || inputs.include_deferred && 'all' || 'arm64' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
@@ -25,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.include_deferred && '["macos-15","ubuntu-24.04-arm","ubuntu-24.04","macos-15-intel","windows-2025"]' || '["macos-15","ubuntu-24.04-arm"]') }}
+        os: ${{ fromJSON(inputs.x86_64_only && '["ubuntu-24.04","windows-2025"]' || inputs.include_deferred && '["macos-15","ubuntu-24.04-arm","ubuntu-24.04","macos-15-intel","windows-2025"]' || '["macos-15","ubuntu-24.04-arm"]') }}
     runs-on: ${{ matrix.os }}
     env:
       CARGO_INCREMENTAL: '0'
@@ -34,6 +41,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: rustfmt, clippy
+      - name: Record native Rust host
+        run: rustc -vV
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26.13.0'

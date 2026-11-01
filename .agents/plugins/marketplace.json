@@ -5,7 +5,7 @@
   "name": "preflight",
   "plugins": [
     {
-      "category": "Productivity",
+      "category": "Developer Tools",
       "name": "preflight",
       "policy": {
         "authentication": "ON_INSTALL",

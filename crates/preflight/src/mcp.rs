@@ -15,6 +15,7 @@ use rmcp::{
 };
 use serde::Serialize;
 use std::sync::Arc;
+mod annotations;
 #[derive(Clone)]
 pub struct Mcp {
     engine: Arc<Engine>,
@@ -85,9 +86,11 @@ impl Mcp {
         result(crate::docker::cleanup_request(&self.engine, &r).await)
     }
     pub fn new(engine: Arc<Engine>) -> Self {
+        let mut tool_router = Self::tool_router();
+        annotations::apply(&mut tool_router);
         Self {
             engine,
-            tool_router: Self::tool_router(),
+            tool_router,
             watches: Arc::default(),
         }
     }

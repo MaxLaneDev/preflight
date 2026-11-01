@@ -81,6 +81,9 @@ async fn stdio_plugin_is_hook_free_preserves_native_mode_and_rejects_bad_inputs(
         "skills/preflight-mcp/SKILL.md",
         "server-package.json",
         "README.md",
+        "review/setup.sh",
+        "review/main.c",
+        "review/pipeline.json",
     ] {
         assert!(zip.by_name(name).is_ok(), "missing {name}");
     }
@@ -94,6 +97,44 @@ async fn stdio_plugin_is_hook_free_preserves_native_mode_and_rejects_bad_inputs(
         plugin["extensions"]["com.openai"]["requires_local_executor"],
         true
     );
+    let openai = &plugin["extensions"]["com.openai"];
+    let interface = &openai["interface"];
+    assert!(
+        interface["shortDescription"]
+            .as_str()
+            .unwrap()
+            .chars()
+            .count()
+            <= 30
+    );
+    assert_eq!(interface["category"], "Developer Tools");
+    for field in [
+        "websiteURL",
+        "supportURL",
+        "privacyPolicyURL",
+        "termsOfServiceURL",
+    ] {
+        let url = reqwest::Url::parse(interface[field].as_str().unwrap()).unwrap();
+        assert_eq!(url.scheme(), "https");
+        assert!(url.username().is_empty() && url.password().is_none());
+    }
+    let prompts = interface["defaultPrompt"].as_array().unwrap();
+    assert!(prompts.len() <= 3);
+    for prompt in prompts {
+        let text = prompt.as_str().unwrap();
+        assert!(!text.trim().is_empty() && !text.contains('\n') && text.chars().count() <= 128);
+    }
+    let review = &openai["review"];
+    assert_eq!(review["commerce"], false);
+    assert_eq!(
+        review["test_cases"]["positive"].as_array().unwrap().len(),
+        5
+    );
+    assert_eq!(
+        review["test_cases"]["negative"].as_array().unwrap().len(),
+        3
+    );
+    assert_eq!(openai["publication"]["countries"], json!([]));
     let original = std::fs::read(&destination).unwrap();
     assert!(
         plugin_stdio::package(&repository, source, &sha, &destination)

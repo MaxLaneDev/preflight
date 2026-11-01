@@ -35,21 +35,12 @@ pub(super) async fn package(
             "server package missing {name}"
         );
     }
-    let metadata: Value = serde_json::from_slice(&fs::read(
-        root.join("integrations/codex/.codex-plugin/plugin.json"),
-    )?)?;
-    let mut interface = metadata["interface"].clone();
-    interface["longDescription"] = json!(
-        "Run local builds and tests, inspect failures and manage change queues through Preflight MCP. Install and start the Preflight server separately with the GitHub curl installer or Homebrew. This package includes the native stdio relay and no lifecycle hooks."
+    let plugin: Value =
+        serde_json::from_slice(&fs::read(root.join("integrations/codex/submission.json"))?)?;
+    ensure!(
+        plugin["version"] == version && plugin["name"] == "preflight",
+        "submission manifest version or identity differs"
     );
-    let plugin = json!({
-        "$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-        "name":"preflight", "version":version,
-        "description":metadata["description"], "author":metadata["author"],
-        "homepage":metadata["homepage"], "repository":metadata["repository"],
-        "license":"MIT",
-        "extensions":{"com.openai":{"requires_local_executor":true,"interface":interface}}
-    });
     let mcp = json!({
         "$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
         "mcpServers":{"preflight":{"type":"stdio","command":"./bin/preflight","args":["mcp-proxy"],"cwd":"${PLUGIN_ROOT}"}}
@@ -68,6 +59,12 @@ pub(super) async fn package(
     );
     files.insert("plugin.json".into(), serde_json::to_vec_pretty(&plugin)?);
     files.insert("mcp.json".into(), serde_json::to_vec_pretty(&mcp)?);
+    for name in ["README.md", "setup.sh", "main.c", "pipeline.json"] {
+        files.insert(
+            format!("review/{name}"),
+            fs::read(root.join("integrations/codex/review").join(name))?,
+        );
+    }
     files.insert(
         "assets/icon.png".into(),
         fs::read(root.join("assets/branding/preflight-icon.png"))?,

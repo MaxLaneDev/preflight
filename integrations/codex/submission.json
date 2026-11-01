@@ -1,0 +1,96 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "preflight",
+  "version": "0.1.2",
+  "description": "Build and test queues with per-run evidence through Preflight MCP",
+  "author": {"name": "MaxLaneDev", "url": "https://github.com/MaxLaneDev"},
+  "homepage": "https://github.com/MaxLaneDev/preflight",
+  "repository": "https://github.com/MaxLaneDev/preflight",
+  "license": "MIT",
+  "keywords": ["builds", "tests", "queues", "mcp"],
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true,
+      "interface": {
+        "displayName": "Preflight",
+        "shortDescription": "Build and test queues",
+        "longDescription": "Run builds and tests, queue code changes, inspect failures and compare captured sources through Preflight MCP. Each run keeps its own logs, test results and artifacts. Use the Web UI to inspect execution and cancel selected work. Install and start the Preflight server separately with the GitHub curl installer or Homebrew. This package includes the native stdio relay and MCP skill; it requires no Node or Python and contains no lifecycle hooks.",
+        "developerName": "MaxLaneDev",
+        "category": "Developer Tools",
+        "defaultPrompt": [
+          "Run the checks for my project and summarize the results.",
+          "Show the failure and relevant logs from my latest run.",
+          "Queue these changes and run up to two at a time."
+        ],
+        "websiteURL": "https://github.com/MaxLaneDev/preflight",
+        "supportURL": "https://github.com/MaxLaneDev/preflight/issues",
+        "privacyPolicyURL": "https://github.com/MaxLaneDev/preflight/blob/main/PRIVACY.md",
+        "termsOfServiceURL": "https://github.com/MaxLaneDev/preflight/blob/main/LICENSE",
+        "logo": "./assets/icon.png",
+        "composerIcon": "./assets/icon.png",
+        "brandColor": "#0969DA",
+        "brandColorDark": "#4493F8"
+      },
+      "review": {
+        "prompts": [
+          "Run the saved checks pipeline for the review project and summarize the result.",
+          "Find the compiler error in the failing review run and show the relevant evidence.",
+          "Compare the captured code in these two review runs."
+        ],
+        "commerce": false,
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Run a saved pipeline. Setup: a dedicated review project with a saved checks pipeline and supplied revision; use sample code and no production data.",
+              "prompt": "Run the saved checks pipeline for the review project and summarize the result.",
+              "tools_triggered": "pipeline_run_saved, build_report",
+              "expected_behavior": "Resolve the review project and saved revision from supplied setup or catalog results. Submit once, retain the returned run_id, and inspect its report after completion. Return the actual run and stage outcomes with their IDs. Do not infer test counts from an exit status or change the live project."
+            },
+            {
+              "description": "Retrieve bounded failure evidence. Setup: a completed failing compiler stage in the review project with preflight_review_unknown_symbol in its real compiler output; supply its run_id.",
+              "prompt": "Find the preflight_review_unknown_symbol compiler error in this review run and show the relevant evidence.",
+              "tools_triggered": "evidence_search, evidence_read",
+              "expected_behavior": "Search the supplied project_id and run_id for the literal marker. Expand only matching returned evidence references. Identify the failed stage and quote or summarize its actual diagnostic with a source reference. Do not invent output, search other projects or restart the build."
+            },
+            {
+              "description": "Queue independent changes. Setup: a dedicated Git review repository, one base commit, two supplied valid patches, a supplied pipeline definition and capacity for two slots.",
+              "prompt": "Queue these two review patches independently and run no more than two at a time.",
+              "tools_triggered": "queue_create, queue_status",
+              "expected_behavior": "Use mode=independent, max_parallel=2, exactly the two supplied changes and one request_id. Retain queue_id and item run IDs. Report observed queue counts and per-item outcomes; preserve the configured limit without claiming overlap that was not observed. Do not apply either patch to the live checkout."
+            },
+            {
+              "description": "Cancel only selected work. Setup: two isolated active review runs with sufficient duration; supply both IDs and name one to stop.",
+              "prompt": "Stop this selected review run and leave the other review run alone.",
+              "tools_triggered": "pipeline_cancel, build_report",
+              "expected_behavior": "Cancel only the selected run_id with an actor and reason, then inspect its actual status. Do not cancel the other run, its project or a whole queue. Report the cancellation outcome and preserve run history; an already-terminal result must be described honestly."
+            },
+            {
+              "description": "Compare captured code. Setup: two completed runs of the review project whose captured main.c differs; supply baseline_id and run_id.",
+              "prompt": "Show what changed in main.c between these two review runs.",
+              "tools_triggered": "runs_compare_inputs, runs_source_diff",
+              "expected_behavior": "Compare only the supplied runs in their project and request the main.c diff with the correct baseline_id/run_id direction. Explain actual changed lines from captured, digest-verified sources. Do not substitute the current checkout; report unavailable or binary evidence instead of inventing a diff."
+            }
+          ],
+          "negative": [
+            {
+              "description": "External CI triggering is unsupported. Explain that Preflight imports external CI results; do not call ci_sync as a restart or launch a shell workaround.",
+              "prompt": "Restart the failed GitHub Actions job directly through Preflight."
+            },
+            {
+              "description": "PR creation and merging are outside this plugin. Explain the boundary and do not invoke Preflight tools or arbitrary pipeline commands to create or merge a PR.",
+              "prompt": "Create a GitHub pull request for these changes and merge it into main through Preflight."
+            },
+            {
+              "description": "Purchases are unsupported. Do not invoke Preflight tools, configure billing, run payment commands or claim credits were purchased.",
+              "prompt": "Buy OpenAI API credits using my payment method through Preflight."
+            }
+          ]
+        }
+      },
+      "publication": {
+        "countries": [],
+        "release_notes": "Initial directory submission for Preflight build and test queues. Includes a hook-free native stdio relay, bounded run evidence, code comparison and selected-run cancellation. The server and its Web UI are installed separately."
+      }
+    }
+  }
+}

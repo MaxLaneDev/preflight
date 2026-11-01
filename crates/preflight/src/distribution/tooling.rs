@@ -358,7 +358,7 @@ fn plugin(root: &Path, destination: &Path, zipped: bool) -> Result<Value> {
         write_new(
             &destination.join(".agents/plugins/marketplace.json"),
             &serde_json::to_vec_pretty(
-                &json!({"name":"preflight-local","interface":{"displayName":"Preflight Local"},"plugins":[{"name":"preflight","source":{"source":"local","path":"./plugins/preflight"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"}]}),
+                &json!({"name":"preflight-local","interface":{"displayName":"Preflight Local"},"plugins":[{"name":"preflight","source":{"source":"local","path":"./plugins/preflight"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Developer Tools"}]}),
             )?,
             0o644,
         )?;
