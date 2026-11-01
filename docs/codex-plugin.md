@@ -30,3 +30,27 @@ UserPromptSubmit validates completion messages. Neither approves tools or starts
 Public directory submission is pending. OpenAI does not accept lifecycle hooks
 in submitted ZIPs and requires eligibility for local MCP plugins.
 [Official requirements](https://developers.openai.com/plugins/deploy/submission).
+
+## Build a hook-free stdio package (0.1.2+)
+
+Use a server archive from the same version as the packaging binary:
+
+```sh
+preflight package plugin-stdio output/preflight-0.1.2-macos-aarch64.tar.gz \
+  --sha256 "$(awk 'NR==1 {print $1}' output/preflight-0.1.2-macos-aarch64.tar.gz.sha256)" \
+  --repository "$PWD" --destination output/preflight-stdio-macos-aarch64.zip
+```
+
+The ZIP includes the native binary, licenses, icon, skill, portable `plugin.json`
+and `mcp.json`. Its launch command uses the bundled binary, not a binary found on
+`PATH`. It connects to an already running server. No Node, Python or lifecycle
+hooks are required. The server's database and credentials stay outside the ZIP.
+Choose this package or the HTTP plugin above; do not enable both connections.
+
+Each archive targets one platform: macOS ARM64 or Linux ARM64. Use a matching
+archive; Windows and x86_64 are deferred. The input checksum and package contents
+are verified before writing the ZIP. Existing destinations are never replaced.
+
+This command builds a package; it does not submit or publish it. OpenAI approval
+for local MCP and a clean installation check in the target desktop client are
+still required. A successful CLI relay test alone is not directory acceptance.

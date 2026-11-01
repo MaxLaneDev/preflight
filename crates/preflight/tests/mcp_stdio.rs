@@ -26,6 +26,109 @@ fn child(endpoint: &str) -> tokio::process::Command {
     command
 }
 
+#[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
+#[tokio::test]
+async fn unpacked_stdio_plugin_uses_bundled_binary_without_path_dependencies() {
+    let temp = tempfile::tempdir().unwrap();
+    let repository = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let package = preflight::distribution::run(&[
+        "create".into(),
+        "--server".into(),
+        env!("CARGO_BIN_EXE_preflight").into(),
+        "--destination".into(),
+        temp.path().join("server-package").to_str().unwrap().into(),
+        "--repository".into(),
+        repository.to_str().unwrap().into(),
+    ])
+    .await
+    .unwrap();
+    let zip = temp.path().join("plugin.zip");
+    preflight::distribution::run(&[
+        "plugin-stdio".into(),
+        package[0]["archive"].as_str().unwrap().into(),
+        "--sha256".into(),
+        package[0]["sha256"].as_str().unwrap().into(),
+        "--destination".into(),
+        zip.to_str().unwrap().into(),
+        "--repository".into(),
+        repository.to_str().unwrap().into(),
+    ])
+    .await
+    .unwrap();
+    let installed = temp.path().join("clean plugin installation");
+    zip::ZipArchive::new(std::fs::File::open(zip).unwrap())
+        .unwrap()
+        .extract(&installed)
+        .unwrap();
+    let mcp: Value =
+        serde_json::from_slice(&std::fs::read(installed.join("mcp.json")).unwrap()).unwrap();
+    let entry = &mcp["mcpServers"]["preflight"];
+    let executable = entry["command"]
+        .as_str()
+        .unwrap()
+        .replace("${PLUGIN_ROOT}", installed.to_str().unwrap());
+    let args: Vec<_> = entry["args"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+
+    let f = Fixture::new();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let stop = CancellationToken::new();
+    let shutdown = stop.clone();
+    let app = preflight::api::router(f.engine.clone());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown.cancelled_owned())
+            .await
+            .unwrap();
+    });
+    let empty_path = temp.path().join("empty PATH");
+    std::fs::create_dir(&empty_path).unwrap();
+    let mut proxy = tokio::process::Command::new(executable)
+        .args(args)
+        .args(["--server", &endpoint])
+        .current_dir(&installed)
+        .env("PATH", &empty_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let client =
+        ().serve((proxy.stdout.take().unwrap(), proxy.stdin.take().unwrap()))
+            .await
+            .unwrap();
+    let capabilities = client
+        .call_tool(CallToolRequestParams::new("server_capabilities"))
+        .await
+        .unwrap();
+    assert_ne!(capabilities.is_error, Some(true));
+    let projects = client
+        .call_tool(CallToolRequestParams::new("projects_list"))
+        .await
+        .unwrap();
+    assert_ne!(projects.is_error, Some(true));
+    client.cancel().await.unwrap();
+    let result = tokio::time::timeout(Duration::from_secs(10), proxy.wait_with_output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!installed.join("data").exists());
+    stop.cancel();
+    server.await.unwrap();
+    f.engine.shutdown().await.unwrap();
+}
+
 #[tokio::test]
 async fn stdio_backend_failure_exits_while_parent_keeps_stdin_open() {
     use axum::{http::StatusCode, routing::post};

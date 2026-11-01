@@ -25,3 +25,9 @@ open, avoiding Tokio's blocking-stdin shutdown wait.
 Integration checks cover tool-schema parity, concurrent calls, cancellation,
 credential forwarding, delayed initialization, expired-session non-replay and
 failure with an open parent pipe.
+
+`package plugin-stdio` builds a hook-free portable ZIP from a checksum-verified,
+same-version server archive. It bundles the native binary and its licenses;
+the client launches `${PLUGIN_ROOT}/bin/preflight mcp-proxy`. Each ZIP targets
+one supported ARM64 platform. Credentials, configuration and lifecycle hooks are
+excluded. Packaging does not grant directory eligibility or submit the plugin.

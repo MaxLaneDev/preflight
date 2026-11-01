@@ -1,6 +1,7 @@
 //! Distribution entry points. Shell launchers share the server's package verifier.
 mod export;
 mod installer;
+mod plugin_stdio;
 mod tooling;
 
 use anyhow::{Context, Result, bail, ensure};
@@ -318,7 +319,7 @@ impl Args {
 }
 
 pub async fn run(arguments: &[String]) -> Result<Value> {
-    let operation=arguments.first().context("package operation required: create, verify, install, status, rollback, uninstall, formula, collect, plugin, export")?;
+    let operation=arguments.first().context("package operation required: create, verify, install, status, rollback, uninstall, formula, collect, plugin, plugin-stdio, export")?;
     let mut args = Args::new(&arguments[1..])?;
     match operation.as_str() {
         "verify" => {

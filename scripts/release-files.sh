@@ -26,6 +26,10 @@ while IFS= read -r archive; do
  if [ -e "$destination/install-preflight.sh" ]; then cmp "$installer" "$destination/install-preflight.sh"; else cp "$installer" "$destination/install-preflight.sh"; fi
  cp "$archive" "$archive.sha256" "$destination/"
  jq -r '.metadata.os+" "+.metadata.arch' "$destination/.manifest" >> "$destination/.platforms"
+ if jq -e '.metadata.arch=="aarch64" and (.metadata.os=="macos" or .metadata.os=="linux")' "$destination/.manifest" >/dev/null; then
+  platform=$(jq -r '.metadata.os+"-"+.metadata.arch' "$destination/.manifest")
+  "$preflight_binary" package plugin-stdio "$archive" --sha256 "$sha" --repository "$root" --destination "$destination/preflight-stdio-plugin-$version-$platform.zip" >/dev/null
+ fi
  if jq -e '.metadata.os=="macos" and .metadata.arch=="aarch64"' "$destination/.manifest" >/dev/null; then
   "$root/scripts/release.sh" formula "$archive" --sha256 "$sha" --url "https://github.com/MaxLaneDev/preflight/releases/download/v$version/$name" --homepage https://github.com/MaxLaneDev/preflight --destination "$destination/preflight.rb" >/dev/null
  fi

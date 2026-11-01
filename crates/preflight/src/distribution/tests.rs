@@ -26,6 +26,122 @@ fn manifest(bytes: &[u8]) -> Value {
     use sha2::{Digest, Sha256};
     json!({"format":"preflight-package-v1","component":"preflight","binary":"preflight","metadata":{"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"version":"0.1.0"},"files":{"preflight":{"sha256":crate::hashing::hex(Sha256::digest(bytes)),"size":bytes.len(),"executable":true}}})
 }
+
+#[tokio::test]
+async fn stdio_plugin_is_hook_free_preserves_native_mode_and_rejects_bad_inputs() {
+    use sha2::{Digest, Sha256};
+    let root = tempfile::tempdir().unwrap();
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut metadata = manifest(b"fixture binary");
+    metadata["metadata"] =
+        json!({"os":"macos","arch":"aarch64","version":env!("CARGO_PKG_VERSION")});
+    for (name, bytes) in [
+        ("LICENSE", b"license".as_slice()),
+        ("THIRD_PARTY_NOTICES.json", b"[]".as_slice()),
+    ] {
+        metadata["files"][name] = json!({"sha256":crate::hashing::hex(Sha256::digest(bytes)),"size":bytes.len(),"executable":false});
+    }
+    let archive = archive(
+        root.path(),
+        &[
+            ("preflight", b"fixture binary", b'0'),
+            ("LICENSE", b"license", b'0'),
+            ("THIRD_PARTY_NOTICES.json", b"[]", b'0'),
+        ],
+        &metadata,
+    );
+    let destination = root.path().join("plugin.zip");
+    let source = archive.to_str().unwrap();
+    let sha = hash(&archive).unwrap();
+    assert!(
+        plugin_stdio::package(&repository, source, &"0".repeat(64), &destination)
+            .await
+            .is_err()
+    );
+    assert!(!destination.exists());
+    plugin_stdio::package(&repository, source, &sha, &destination)
+        .await
+        .unwrap();
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(&destination).unwrap()).unwrap();
+    let names: Vec<_> = zip
+        .file_names()
+        .map(|name| name.unwrap().into_owned())
+        .collect();
+    assert!(names.iter().all(|n| safe_name(n)
+        && !n.contains("hooks")
+        && !n.starts_with(".codex-plugin/")
+        && !n.ends_with(".toml")));
+    assert_eq!(
+        zip.by_name("bin/preflight").unwrap().unix_mode().unwrap() & 0o777,
+        0o755
+    );
+    for name in [
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.json",
+        "skills/preflight-mcp/SKILL.md",
+        "server-package.json",
+        "README.md",
+    ] {
+        assert!(zip.by_name(name).is_ok(), "missing {name}");
+    }
+    let mcp: Value = serde_json::from_reader(zip.by_name("mcp.json").unwrap()).unwrap();
+    assert_eq!(mcp["mcpServers"]["preflight"]["type"], "stdio");
+    assert_eq!(
+        mcp["mcpServers"]["preflight"]["command"],
+        "${PLUGIN_ROOT}/bin/preflight"
+    );
+    let plugin: Value = serde_json::from_reader(zip.by_name("plugin.json").unwrap()).unwrap();
+    assert_eq!(plugin["version"], env!("CARGO_PKG_VERSION"));
+    assert!(plugin.get("hooks").is_none());
+    assert_eq!(
+        plugin["extensions"]["com.openai"]["requires_local_executor"],
+        true
+    );
+    let original = std::fs::read(&destination).unwrap();
+    assert!(
+        plugin_stdio::package(&repository, source, &sha, &destination)
+            .await
+            .is_err()
+    );
+    assert_eq!(std::fs::read(&destination).unwrap(), original);
+
+    // A complete checksum-valid client/old server is still the wrong input.
+    for change in ["client", "old version", "unsupported platform"] {
+        let altered = tempfile::tempdir().unwrap();
+        let mut bad = metadata.clone();
+        match change {
+            "client" => bad["component"] = json!("preflight-client"),
+            "old version" => bad["metadata"]["version"] = json!("0.0.1"),
+            _ => bad["metadata"]["arch"] = json!("x86_64"),
+        }
+        let file = archive_for_stdio_test(altered.path(), &bad);
+        let out = altered.path().join("plugin.zip");
+        assert!(
+            plugin_stdio::package(
+                &repository,
+                file.to_str().unwrap(),
+                &hash(&file).unwrap(),
+                &out
+            )
+            .await
+            .is_err(),
+            "{change}"
+        );
+        assert!(!out.exists());
+    }
+}
+
+fn archive_for_stdio_test(root: &Path, manifest: &Value) -> PathBuf {
+    archive(
+        root,
+        &[
+            ("preflight", b"fixture binary", b'0'),
+            ("LICENSE", b"license", b'0'),
+            ("THIRD_PARTY_NOTICES.json", b"[]", b'0'),
+        ],
+        manifest,
+    )
+}
 #[test]
 fn unsafe_package_paths_are_rejected() {
     for value in [

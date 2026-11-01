@@ -10,7 +10,7 @@ fn output(command: &mut Command) -> Result<Vec<u8>> {
     );
     Ok(result.stdout)
 }
-fn walk(root: &Path) -> Result<Vec<PathBuf>> {
+pub(super) fn walk(root: &Path) -> Result<Vec<PathBuf>> {
     let mut result = vec![];
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
@@ -395,6 +395,13 @@ pub(super) async fn run(operation: &str, mut args: Args) -> Result<Value> {
             args.zip = false;
             args.finish()?;
             plugin(&root, &dest, zipped)
+        }
+        "plugin-stdio" => {
+            let source = args.one()?;
+            let sha = args.take("--sha256")?;
+            let dest = args.path("--destination")?;
+            args.finish()?;
+            super::plugin_stdio::package(&root, &source, &sha, &dest).await
         }
         "formula" => {
             let source = args.one()?;
