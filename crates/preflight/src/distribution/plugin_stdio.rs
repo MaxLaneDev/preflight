@@ -52,7 +52,7 @@ pub(super) async fn package(
     });
     let mcp = json!({
         "$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-        "mcpServers":{"preflight":{"type":"stdio","command":"${PLUGIN_ROOT}/bin/preflight","args":["mcp-proxy"],"cwd":"${PLUGIN_ROOT}"}}
+        "mcpServers":{"preflight":{"type":"stdio","command":"./bin/preflight","args":["mcp-proxy"],"cwd":"${PLUGIN_ROOT}"}}
     });
     let mut files = BTreeMap::new();
     for name in manifest.files.keys().filter(|n| {

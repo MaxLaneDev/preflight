@@ -86,10 +86,7 @@ async fn stdio_plugin_is_hook_free_preserves_native_mode_and_rejects_bad_inputs(
     }
     let mcp: Value = serde_json::from_reader(zip.by_name("mcp.json").unwrap()).unwrap();
     assert_eq!(mcp["mcpServers"]["preflight"]["type"], "stdio");
-    assert_eq!(
-        mcp["mcpServers"]["preflight"]["command"],
-        "${PLUGIN_ROOT}/bin/preflight"
-    );
+    assert_eq!(mcp["mcpServers"]["preflight"]["command"], "./bin/preflight");
     let plugin: Value = serde_json::from_reader(zip.by_name("plugin.json").unwrap()).unwrap();
     assert_eq!(plugin["version"], env!("CARGO_PKG_VERSION"));
     assert!(plugin.get("hooks").is_none());

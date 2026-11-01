@@ -28,6 +28,10 @@ failure with an open parent pipe.
 
 `package plugin-stdio` builds a hook-free portable ZIP from a checksum-verified,
 same-version server archive. It bundles the native binary and its licenses;
-the client launches `${PLUGIN_ROOT}/bin/preflight mcp-proxy`. Each ZIP targets
+the client launches `./bin/preflight mcp-proxy` from `${PLUGIN_ROOT}`. Each ZIP targets
 one supported ARM64 platform. Credentials, configuration and lifecycle hooks are
 excluded. Packaging does not grant directory eligibility or submit the plugin.
+
+Codex 0.164.0 rejects placeholder-rooted executable tokens even though it accepts
+`${PLUGIN_ROOT}` for `cwd`. Read-only `plugin/read` confirms that the contained
+`./bin/preflight` command discovers one MCP server, one skill and no hooks.

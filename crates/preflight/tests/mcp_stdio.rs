@@ -63,10 +63,14 @@ async fn unpacked_stdio_plugin_uses_bundled_binary_without_path_dependencies() {
     let mcp: Value =
         serde_json::from_slice(&std::fs::read(installed.join("mcp.json")).unwrap()).unwrap();
     let entry = &mcp["mcpServers"]["preflight"];
-    let executable = entry["command"]
-        .as_str()
-        .unwrap()
-        .replace("${PLUGIN_ROOT}", installed.to_str().unwrap());
+    // Agent Plugins resolves contained ./ commands from the plugin root.
+    let executable = installed.join(
+        entry["command"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("./")
+            .unwrap(),
+    );
     let args: Vec<_> = entry["args"]
         .as_array()
         .unwrap()
