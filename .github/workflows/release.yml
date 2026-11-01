@@ -9,8 +9,12 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       include_deferred: false
+  macos27:
+    uses: ./.github/workflows/ci.yml
+    with:
+      macos27_only: true
   draft:
-    needs: check
+    needs: [check, macos27]
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write

@@ -5,6 +5,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      macos27_only:
+        description: 'Check macOS 27 ARM64 compatibility without publishing a second ARM64 archive'
+        type: boolean
+        default: false
       x86_64_only:
         description: 'Check only Linux x86_64 and Windows x86_64'
         type: boolean
@@ -15,6 +19,9 @@ on:
         default: false
   workflow_call:
     inputs:
+      macos27_only:
+        type: boolean
+        default: false
       x86_64_only:
         type: boolean
         default: false
@@ -24,7 +31,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: check-${{ github.workflow }}-${{ github.ref }}-${{ inputs.x86_64_only && 'x86_64' || inputs.include_deferred && 'all' || 'supported' }}
+  group: check-${{ github.workflow }}-${{ github.ref }}-${{ inputs.macos27_only && 'macos27' || inputs.x86_64_only && 'x86_64' || inputs.include_deferred && 'all' || 'supported' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
@@ -32,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.x86_64_only && '["ubuntu-24.04","windows-2025"]' || '["macos-15","macos-15-intel","ubuntu-24.04-arm","ubuntu-24.04","windows-2025"]') }}
+        os: ${{ fromJSON(inputs.macos27_only && '["xcode-27"]' || inputs.x86_64_only && '["ubuntu-24.04","windows-2025"]' || '["macos-15","macos-15-intel","ubuntu-24.04-arm","ubuntu-24.04","windows-2025"]') }}
     runs-on: ${{ matrix.os }}
     env:
       CARGO_INCREMENTAL: '0'
@@ -43,6 +50,13 @@ jobs:
           components: rustfmt, clippy
       - name: Record native Rust host
         run: rustc -vV
+      - name: Verify macOS 27 runner identity
+        if: inputs.macos27_only
+        shell: bash
+        run: |
+          sw_vers
+          test "$(sw_vers -productVersion | cut -d . -f 1)" = 27
+          test "$(uname -m)" = arm64
       - name: Build Windows releases with the static C runtime
         if: runner.os == 'Windows'
         shell: pwsh
@@ -84,6 +98,7 @@ jobs:
         shell: pwsh
         run: ./scripts/test-windows-package.ps1 -Packages dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !inputs.macos27_only }}
         with:
           name: preflight-${{ matrix.os }}
           path: dist/

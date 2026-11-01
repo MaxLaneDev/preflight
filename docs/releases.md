@@ -24,7 +24,10 @@ Windows archives use the static C runtime and include the same Web UI and MCP;
 Native Windows acceptance checks install/reinstall, UI/API/MCP startup, refusal
 to uninstall a running server, and removal that preserves configuration and data.
 After publication, `install-release.yml` downloads the published installers and
-checks their archive selection and UI/MCP startup on all five native targets.
+checks their archive selection and UI/MCP startup on all five native targets,
+including an additional macOS 27 ARM64 environment. The `xcode-27` compatibility
+job verifies the actual OS version and runs the Rust and package checks. Release
+archives remain built on macOS 15; the macOS 27 check does not replace that archive.
 
 ## Homebrew
 

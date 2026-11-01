@@ -14,6 +14,8 @@
 | Public plugin directory | Not submitted; eligibility/review pending |
 
 Linux x86_64 and Windows x86_64 native CI/release checks are in progress for 0.1.2.
+macOS 27 ARM64 has a separate compatibility check on the `xcode-27` runner;
+support is not accepted until its tests and the published Mac ARM64 installer pass.
 Physical remote x86_64 worker acceptance remains deferred. ARM64 Docker is not x86_64 acceptance.
 NAT traversal remains future work. Local check receipts stay outside the public tree.
 
