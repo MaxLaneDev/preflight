@@ -1,7 +1,7 @@
 # Releases
 
 Release packages include the server, Web UI and MCP. Download
-[v0.1.0](https://github.com/MaxLaneDev/preflight/releases/tag/v0.1.0) or use
+[the latest release](https://github.com/MaxLaneDev/preflight/releases/latest) or use
 the [installer and Homebrew tap](installation.md).
 
 ## Build and check packages
