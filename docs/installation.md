@@ -13,11 +13,12 @@ On Windows, download and run the release installer in 64-bit PowerShell:
 
 ```powershell
 curl.exe -fL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.ps1 -o install-preflight.ps1
-.\install-preflight.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-preflight.ps1
 ```
 
 It needs neither administrator access nor Node/Python. It prints the installed
 binary path and start arguments; it does not start a service or change PATH.
+The execution-policy option applies only to this PowerShell process.
 Configuration and data default to `%LOCALAPPDATA%\Preflight`, outside the versioned
 binary directory. Updates preserve configuration and do not stop running builds.
 

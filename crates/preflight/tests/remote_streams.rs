@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 #[allow(dead_code)]
 mod common;
 use common::*;
@@ -47,7 +49,6 @@ async fn worker(base: &str, state: &Path, token: Option<&str>) {
         String::from_utf8_lossy(&output.stderr)
     );
 }
-#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_reads_remote_output_before_completion_and_preserves_more_than_snapshot() {
     let f = Fixture::new();

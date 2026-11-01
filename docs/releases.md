@@ -23,6 +23,8 @@ Windows archives use the static C runtime and include the same Web UI and MCP;
 `install.ps1` verifies the checksum and installs without administrator access.
 Native Windows acceptance checks install/reinstall, UI/API/MCP startup, refusal
 to uninstall a running server, and removal that preserves configuration and data.
+After publication, `install-release.yml` downloads the published installers and
+checks their archive selection and UI/MCP startup on all five native targets.
 
 ## Homebrew
 

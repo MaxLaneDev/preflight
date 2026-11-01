@@ -1,8 +1,9 @@
 # Native installation and Web/MCP cold-start acceptance in an isolated directory.
-param([Parameter(Mandatory=$true)][string]$Packages)
+param([Parameter(Mandatory=$true)][string]$Packages, [string]$Installer)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
+if (!$Installer) { $Installer = Join-Path $root 'install.ps1' }
 $packagesFound = @(Get-ChildItem -LiteralPath $Packages -Filter '*-windows-x86_64.tar.gz')
 if ($packagesFound.Count -ne 1) { throw 'Expected one Windows package.' }
 $archive = $packagesFound[0].FullName
@@ -16,15 +17,15 @@ try {
     $data = Join-Path $temporary 'data'
     $build = if ($env:PREFLIGHT_BINARY) { $env:PREFLIGHT_BINARY } else { Join-Path $root 'target\release\preflight.exe' }
     $failed = $false
-    try { & "$root\install.ps1" -Archive $archive -Sha256 ('0' * 64) -Prefix $prefix -Config $config -Data $data }
+    try { & $Installer -Archive $archive -Sha256 ('0' * 64) -Prefix $prefix -Config $config -Data $data }
     catch { $failed = $true }
     if (!$failed -or (Test-Path -LiteralPath $prefix)) { throw 'Invalid checksum changed installation.' }
-    $receipt = (& "$root\install.ps1" -Archive $archive -Sha256 $sha -Prefix $prefix -Config $config -Data $data) | ConvertFrom-Json
+    $receipt = (& $Installer -Archive $archive -Sha256 $sha -Prefix $prefix -Config $config -Data $data) | ConvertFrom-Json
     $binary = $receipt.binary
     $version = (& $binary --version) | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0 -or $version.os -ne 'windows' -or $version.arch -ne 'x86_64') { throw 'Wrong installed platform.' }
     $original = [IO.File]::ReadAllText($config)
-    & "$root\install.ps1" -Archive $archive -Sha256 $sha -Prefix $prefix -Config $config -Data $data | Out-Null
+    & $Installer -Archive $archive -Sha256 $sha -Prefix $prefix -Config $config -Data $data | Out-Null
     if ([IO.File]::ReadAllText($config) -cne $original) { throw 'Reinstallation changed configuration.' }
     $port = (& $build package free-port).Trim()
     [IO.File]::WriteAllText($config, $original.Replace('127.0.0.1:4170', "127.0.0.1:$port"))

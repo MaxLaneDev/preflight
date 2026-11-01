@@ -42,6 +42,7 @@ const SCRIPTS: &[&str] = &[
     "test-codex-plugin.sh",
     "test-install-sh.sh",
     "test-windows-package.ps1",
+    "check-release-install.sh",
     "test-client.sh",
     "test-client.cjs",
     "test-launchd.sh",

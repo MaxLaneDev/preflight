@@ -3,6 +3,9 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' 0; trap 'exit 1' HUP INT TERM
 "$root/scripts/export-public-source.sh" "$tmp/source"
+for file in install.ps1 .gitattributes .github/workflows/install-release.yml scripts/check-release-install.sh scripts/test-windows-package.ps1; do
+ [ -f "$tmp/source/$file" ] || { echo "Missing distribution file: $file" >&2; exit 1; }
+done
 for name in c-basic cpp-basic go-basic; do [ -d "$tmp/source/examples/$name" ]; done
 [ "$(find "$tmp/source/examples" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 3 ]
 for file in build.sh check.sh; do [ -x "$tmp/source/examples/cpp-basic/$file" ]; cmp "$root/examples/cpp-basic/$file" "$tmp/source/examples/cpp-basic/$file"; done
