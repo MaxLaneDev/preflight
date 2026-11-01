@@ -4,9 +4,9 @@ require "securerandom"
 class Preflight < Formula
   desc "Local build and test server with Web UI and MCP"
   homepage 'https://github.com/MaxLaneDev/preflight'
-  url 'https://github.com/MaxLaneDev/preflight/releases/download/v0.1.0/preflight-0.1.0-macos-aarch64.tar.gz'
-  version '0.1.0'
-  sha256 '9b94f2b2d65baf82e2b7cc18db50a00cce45cbae6e51f6bb1d6ca782dfc04c9e'
+  url 'https://github.com/MaxLaneDev/preflight/releases/download/v0.1.1/preflight-0.1.1-macos-aarch64.tar.gz'
+  version '0.1.1'
+  sha256 '2d9bc219e8530e78c29cc2eca0d5f2ebf5750f7a9b95d7b2068f424b9883b37a'
   license "MIT"
   depends_on :macos
   depends_on arch: :arm64
