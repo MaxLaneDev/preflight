@@ -60,21 +60,27 @@ jobs:
       - run: cargo clippy --release --locked --workspace --all-targets --keep-going -- -D warnings
       - run: cargo test --release --locked --workspace --no-fail-fast
         if: ${{ !cancelled() }}
-      - run: cargo build --release --locked --workspace
+      - id: build
+        run: cargo build --release --locked --workspace
+        if: ${{ !cancelled() }}
       - run: node --test crates/preflight-client/tests/*.test.mjs
+        if: ${{ !cancelled() }}
         shell: bash
       - run: sh scripts/test-script-entrypoints.sh
+        if: ${{ !cancelled() }}
         shell: bash
-      - name: Package server with required Web UI and MCP
+      - id: package
+        name: Package server with required Web UI and MCP
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
         run: |
           suffix=""
           if [ "$RUNNER_OS" = "Windows" ]; then suffix=".exe"; fi
           sh scripts/release.sh package --server "${PREFLIGHT_BINARY:-target/release/preflight$suffix}" --destination dist
       - run: sh scripts/test-without-node.sh dist
-        if: runner.os != 'Windows'
+        if: ${{ !cancelled() && runner.os != 'Windows' && steps.package.outcome == 'success' }}
       - name: Install and start native Windows package
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.package.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/test-windows-package.ps1 -Packages dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
