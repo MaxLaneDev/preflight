@@ -9,6 +9,7 @@ pub mod engine;
 pub mod executor;
 pub mod junit;
 pub mod mcp;
+pub mod mcp_stdio;
 pub mod model;
 pub mod pipeline;
 pub mod secrets;

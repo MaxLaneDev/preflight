@@ -37,7 +37,7 @@ tower = { version = "0.5.3", features = ["util"] }
 
 [dependencies.rmcp]
 version = "3.8.0"
-features = ["server", "macros", "transport-streamable-http-server"]
+features = ["server", "client", "macros", "transport-streamable-http-server", "transport-streamable-http-client-reqwest", "transport-async-rw"]
 
 [dependencies.uuid]
 version = "1.29.0"

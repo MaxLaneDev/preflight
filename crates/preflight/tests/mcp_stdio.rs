@@ -1,0 +1,223 @@
+#[allow(dead_code)]
+mod common;
+use common::*;
+use preflight::model::RunState;
+use rmcp::{ServiceExt, model::CallToolRequestParams, transport::StreamableHttpClientTransport};
+use serde_json::{Value, json};
+use std::{
+    process::Stdio,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
+use tokio::io::AsyncWriteExt;
+use tokio_util::sync::CancellationToken;
+
+fn child(endpoint: &str) -> tokio::process::Command {
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_preflight"));
+    command
+        .args(["mcp-proxy", "--server", endpoint])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    command
+}
+
+#[tokio::test]
+async fn stdio_backend_failure_exits_while_parent_keeps_stdin_open() {
+    use axum::{http::StatusCode, routing::post};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let stop = CancellationToken::new();
+    let shutdown = stop.clone();
+    let app = axum::Router::new().route("/mcp", post(|| async { StatusCode::UNAUTHORIZED }));
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown.cancelled_owned())
+            .await
+            .unwrap();
+    });
+    let mut proxy = child(&endpoint).spawn().unwrap();
+    let mut stdin = proxy.stdin.take().unwrap();
+    let initialize = json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"raw-parent","version":"1"}}});
+    stdin
+        .write_all(format!("{initialize}\n").as_bytes())
+        .await
+        .unwrap();
+    let status = tokio::time::timeout(Duration::from_secs(10), proxy.wait())
+        .await
+        .expect("proxy waited for stdin EOF after backend failure")
+        .unwrap();
+    assert!(!status.success());
+    drop(stdin);
+    stop.cancel();
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn stdio_uses_existing_engine_tools_cancellation_and_clean_eof() {
+    let f = Fixture::new();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let stop = CancellationToken::new();
+    let shutdown = stop.clone();
+    let app = preflight::api::router(f.engine.clone());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown.cancelled_owned())
+            .await
+            .unwrap();
+    });
+    let mut proxy = child(&endpoint).current_dir(f.temp.path()).spawn().unwrap();
+    let stdout = proxy.stdout.take().unwrap();
+    let stdin = proxy.stdin.take().unwrap();
+    let client = ().serve((stdout, stdin)).await.unwrap();
+    let tools = client.list_all_tools().await.unwrap();
+    assert!(tools.iter().any(|t| t.name == "pipeline_cancel"));
+    let direct = ().serve(StreamableHttpClientTransport::from_uri(endpoint.clone())).await.unwrap();
+    assert_eq!(
+        serde_json::to_value(&tools).unwrap(),
+        serde_json::to_value(direct.list_all_tools().await.unwrap()).unwrap()
+    );
+    direct.cancel().await.unwrap();
+    let (first, second) = tokio::join!(
+        client.call_tool(CallToolRequestParams::new("server_capabilities")),
+        client.call_tool(CallToolRequestParams::new("projects_list")),
+    );
+    assert_ne!(first.unwrap().is_error, Some(true));
+    assert_ne!(second.unwrap().is_error, Some(true));
+    let started = client
+        .call_tool(
+            CallToolRequestParams::new("build_start").with_arguments(
+                serde_json::to_value(f.request(&["sleep"], 30))
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_ne!(started.is_error, Some(true), "{started:?}");
+    let run: Value = serde_json::from_str(&started.content[0].as_text().unwrap().text).unwrap();
+    let id = run["run_id"]
+        .as_str()
+        .or_else(|| run["id"].as_str())
+        .unwrap();
+    let cancelled = client
+        .call_tool(
+            CallToolRequestParams::new("pipeline_cancel").with_arguments(
+                json!({"run_id":id,"actor":"agent","reason":"stdio cancellation"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_ne!(cancelled.is_error, Some(true), "{cancelled:?}");
+    assert_eq!(finished(&f.engine, id).await.status, RunState::Cancelled);
+    client.cancel().await.unwrap();
+    let output = tokio::time::timeout(Duration::from_secs(10), proxy.wait_with_output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!f.temp.path().join("data").join("preflight.toml").exists());
+    stop.cancel();
+    server.await.unwrap();
+    f.engine.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn stdio_forwards_credentials_and_never_replays_expired_session_mutations() {
+    use axum::{
+        Json,
+        http::{HeaderMap, StatusCode},
+        response::IntoResponse,
+        routing::post,
+    };
+    let calls = Arc::new(AtomicUsize::new(0));
+    let initializations = Arc::new(AtomicUsize::new(0));
+    let ready = Arc::new(AtomicBool::new(false));
+    let early_calls = Arc::new(AtomicUsize::new(0));
+    let secret = "stdio-fixture-credential-private-value";
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let (observed, initialized, became_ready, early) = (
+        calls.clone(),
+        initializations.clone(),
+        ready,
+        early_calls.clone(),
+    );
+    let app = axum::Router::new().route("/mcp", post(move |headers: HeaderMap, Json(body): Json<Value>| {
+        let (calls, initializations, ready, early) = (observed.clone(), initialized.clone(), became_ready.clone(), early.clone());
+        async move {
+            if headers.get("authorization").and_then(|v|v.to_str().ok()) != Some("Bearer stdio-fixture-credential-private-value") {
+                return StatusCode::UNAUTHORIZED.into_response();
+            }
+            match body["method"].as_str().unwrap() {
+                "initialize" => {
+                    initializations.fetch_add(1, Ordering::SeqCst);
+                    ([("mcp-session-id","fixture-session")], Json(json!({"jsonrpc":"2.0","id":body["id"],"result":{"protocolVersion":body["params"]["protocolVersion"],"capabilities":{"tools":{}},"serverInfo":{"name":"fixture","version":"1"}}}))).into_response()
+                }
+                "notifications/initialized" => {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    ready.store(true, Ordering::SeqCst);
+                    StatusCode::ACCEPTED.into_response()
+                },
+                "tools/call" => {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    if !ready.load(Ordering::SeqCst) {
+                        early.fetch_add(1, Ordering::SeqCst);
+                        return StatusCode::BAD_REQUEST.into_response();
+                    }
+                    StatusCode::NOT_FOUND.into_response()
+                }
+                _ => StatusCode::ACCEPTED.into_response(),
+            }
+        }
+    }));
+    let stop = CancellationToken::new();
+    let shutdown = stop.clone();
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown.cancelled_owned())
+            .await
+            .unwrap();
+    });
+    let mut proxy = child(&endpoint)
+        .args(["--token-env", "PF_STDIO_TEST_TOKEN"])
+        .env("PF_STDIO_TEST_TOKEN", secret)
+        .spawn()
+        .unwrap();
+    let client =
+        ().serve((proxy.stdout.take().unwrap(), proxy.stdin.take().unwrap()))
+            .await
+            .unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        client.call_tool(CallToolRequestParams::new("mutation")),
+    )
+    .await
+    .unwrap();
+    assert!(result.is_err() || result.unwrap().is_error == Some(true));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(initializations.load(Ordering::SeqCst), 1);
+    assert_eq!(early_calls.load(Ordering::SeqCst), 0);
+    let _ = client.cancel().await;
+    let output = tokio::time::timeout(Duration::from_secs(10), proxy.wait_with_output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&output.stderr).contains(secret));
+    stop.cancel();
+    server.await.unwrap();
+}

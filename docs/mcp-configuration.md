@@ -9,6 +9,21 @@ Connect your client to `http://127.0.0.1:4170/mcp`.
 The [Codex plugin](codex-plugin.md) supplies this connection. Configure it once.
 If API tokens are enabled, configure Bearer authentication in the client; never put tokens in Git.
 
+## Stdio clients (0.1.2+)
+
+Start the server first. A stdio client can launch a relay to that same backend:
+
+```json
+{"mcpServers":{"preflight":{"type":"stdio","command":"/absolute/path/to/preflight","args":["mcp-proxy"]}}}
+```
+
+Use `--server http://127.0.0.1:PORT/mcp` for another loopback port. Add
+`--token-env PREFLIGHT_API_TOKEN` if access tokens are enabled, and supply the token
+through the client's private environment. The relay opens no database, follows no
+HTTP redirects and never retries an expired-session mutation. A transport failure
+can leave an unknown outcome: inspect runs/events before retrying. Closing the
+client does not cancel already submitted builds.
+
 ## Register, save, run
 
 Replace `PROJECT_ID` and `RUN_ID` with returned IDs. Paths must be inside allowed roots.
