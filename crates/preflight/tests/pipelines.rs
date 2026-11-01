@@ -354,6 +354,10 @@ async fn cwd_env_explicit_input_and_digest_tampering_are_checked() {
     #[cfg(windows)]
     {
         let mut p = std::fs::metadata(&artifact.path).unwrap().permissions();
+        #[expect(
+            clippy::permissions_set_readonly_false,
+            reason = "Windows test clears the file attribute; Unix permission bits are not changed"
+        )]
         p.set_readonly(false);
         std::fs::set_permissions(&artifact.path, p).unwrap();
     }

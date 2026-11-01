@@ -8,6 +8,13 @@ use preflight::{
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 struct Fixture {
+    #[cfg_attr(
+        windows,
+        expect(
+            dead_code,
+            reason = "Retains the temporary directory for the lifetime of the fixture"
+        )
+    )]
     temp: tempfile::TempDir,
     e: Arc<Engine>,
     project: Project,
