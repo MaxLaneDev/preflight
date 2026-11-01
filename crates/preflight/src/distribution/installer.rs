@@ -36,7 +36,15 @@ fn state(root: &Path) -> Result<State> {
             && value.previous.as_ref().is_none_or(|v| digest(v)),
         "invalid installation record"
     );
+    #[cfg(unix)]
     let target = fs::read_link(root.join("current"))?;
+    #[cfg(windows)]
+    let target = {
+        no_symlink(&root.join("current"))?;
+        let file = crate::archives::open_read(&root.join("current"))?;
+        ensure!(file.metadata()?.len() == 64, "invalid activation pointer");
+        Path::new("versions").join(fs::read_to_string(root.join("current"))?)
+    };
     let name = target
         .file_name()
         .and_then(|v| v.to_str())
@@ -54,18 +62,28 @@ fn state(root: &Path) -> Result<State> {
 fn activate(root: &Path, value: &State) -> Result<Value> {
     ensure!(digest(&value.current), "invalid version ID");
     let current = root.join("current");
+    #[cfg(unix)]
     if let Ok(meta) = fs::symlink_metadata(&current) {
         ensure!(
             meta.is_symlink(),
             "current must be an owned activation symlink"
         );
     }
-    let temporary = root.join(format!(".activate-{}", uuid::Uuid::now_v7()));
     #[cfg(unix)]
-    std::os::unix::fs::symlink(Path::new("versions").join(&value.current), &temporary)?;
-    #[cfg(not(unix))]
-    bail!("package activation currently supports Unix hosts only");
-    fs::rename(&temporary, current)?;
+    {
+        let temporary = root.join(format!(".activate-{}", uuid::Uuid::now_v7()));
+        std::os::unix::fs::symlink(Path::new("versions").join(&value.current), &temporary)?;
+        fs::rename(&temporary, current)?;
+    }
+    #[cfg(windows)]
+    {
+        no_symlink(&current)?;
+        // A checksum pointer avoids privileged symlinks and replacing a running executable.
+        let mut pointer = tempfile::NamedTempFile::new_in(root)?;
+        pointer.write_all(value.current.as_bytes())?;
+        pointer.as_file().sync_all()?;
+        pointer.persist(current).map_err(|e| e.error)?;
+    }
     let mut record = tempfile::NamedTempFile::new_in(root)?;
     serde_json::to_writer_pretty(&mut record, value)?;
     record.write_all(b"\n")?;
@@ -254,8 +272,15 @@ pub(super) async fn install(
         result["admin_token_file"] = json!(credential);
     }
     result["configuration"] = json!(config);
+    #[cfg(unix)]
+    let executable = root.join("current").join(&value.binary);
+    #[cfg(windows)]
+    let executable = root
+        .join("versions")
+        .join(&value.current)
+        .join(&value.binary);
     result["start"] = json!([
-        root.join("current").join(&value.binary).to_string_lossy(),
+        executable.to_string_lossy(),
         "--config",
         config.to_string_lossy(),
         "serve"
@@ -300,26 +325,54 @@ pub(super) fn manage(operation: &str, prefix: &Path) -> Result<Value> {
             ]),
         "installation contains unrelated files; refusing uninstall"
     );
-    let processes = std::process::Command::new("ps")
-        .args(["-ax", "-o", "pid=,command="])
-        .output()?;
-    ensure!(
-        processes.status.success(),
-        "cannot inspect active processes"
-    );
-    for line in std::str::from_utf8(&processes.stdout)?.lines() {
-        let line = line.trim();
-        let Some((pid, command)) = line.split_once(char::is_whitespace) else {
-            continue;
-        };
-        if pid.parse::<u32>()? != std::process::id() {
-            let command = command.trim_start();
-            ensure!(
-                !command.starts_with(&root.join("current").to_string_lossy().into_owned())
-                    && !command.starts_with(&root.join("versions").to_string_lossy().into_owned()),
-                "stop the installed service before uninstalling"
-            );
+    #[cfg(unix)]
+    {
+        let processes = std::process::Command::new("ps")
+            .args(["-ax", "-o", "pid=,command="])
+            .output()?;
+        ensure!(
+            processes.status.success(),
+            "cannot inspect active processes"
+        );
+        for line in std::str::from_utf8(&processes.stdout)?.lines() {
+            let line = line.trim();
+            let Some((pid, command)) = line.split_once(char::is_whitespace) else {
+                continue;
+            };
+            if pid.parse::<u32>()? != std::process::id() {
+                let command = command.trim_start();
+                ensure!(
+                    !command.starts_with(&root.join("current").to_string_lossy().into_owned())
+                        && !command
+                            .starts_with(&root.join("versions").to_string_lossy().into_owned()),
+                    "stop the installed service before uninstalling"
+                );
+            }
         }
+    }
+    #[cfg(windows)]
+    {
+        let processes = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command",
+                "$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); ConvertTo-Json -Compress -InputObject @(Get-Process | ForEach-Object { $_.Path } | Where-Object { $_ })"])
+            .output()?;
+        ensure!(
+            processes.status.success(),
+            "cannot inspect active processes"
+        );
+        let paths: Vec<String> = serde_json::from_slice(&processes.stdout)?;
+        let root_text = root.to_string_lossy();
+        let prefix = format!(
+            "{}\\",
+            root_text.strip_prefix(r"\\?\").unwrap_or(&root_text)
+        )
+        .to_lowercase();
+        ensure!(
+            !paths
+                .iter()
+                .any(|path| path.to_lowercase().starts_with(&prefix)),
+            "stop the installed service before uninstalling"
+        );
     }
     let versions = root.join("versions");
     no_symlink(&versions)?;

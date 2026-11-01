@@ -150,7 +150,7 @@ async fn stdio_plugin_is_hook_free_preserves_native_mode_and_rejects_bad_inputs(
         match change {
             "client" => bad["component"] = json!("preflight-client"),
             "old version" => bad["metadata"]["version"] = json!("0.0.1"),
-            _ => bad["metadata"]["arch"] = json!("x86_64"),
+            _ => bad["metadata"]["arch"] = json!("riscv64"),
         }
         let file = archive_for_stdio_test(altered.path(), &bad);
         let out = altered.path().join("plugin.zip");

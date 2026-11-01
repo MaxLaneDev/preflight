@@ -13,7 +13,8 @@
 | Public releases / Homebrew | v0.1.1 published; ARM64 CI, macOS curl/Homebrew installation and UI/MCP startup checked |
 | Public plugin directory | Not submitted; eligibility/review pending |
 
-Windows and physical x86_64 are deferred. ARM64 Docker is not x86_64 acceptance.
+Linux x86_64 and Windows x86_64 native CI/release checks are in progress for 0.1.2.
+Physical remote x86_64 worker acceptance remains deferred. ARM64 Docker is not x86_64 acceptance.
 NAT traversal remains future work. Local check receipts stay outside the public tree.
 
 ```sh

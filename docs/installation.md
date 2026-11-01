@@ -7,6 +7,30 @@ macOS ARM64 and Linux ARM64. Install with curl:
 curl -fsSL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.sh | sh
 ```
 
+The 0.1.2 candidate also targets macOS x86_64, Linux x86_64 and Windows x86_64. These become
+available through `latest` only after native CI checks and release publication.
+On Windows, download and run the release installer in 64-bit PowerShell:
+
+```powershell
+curl.exe -fL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.ps1 -o install-preflight.ps1
+.\install-preflight.ps1
+```
+
+It needs neither administrator access nor Node/Python. It prints the installed
+binary path and start arguments; it does not start a service or change PATH.
+Configuration and data default to `%LOCALAPPDATA%\Preflight`, outside the versioned
+binary directory. Updates preserve configuration and do not stop running builds.
+
+For a downloaded Windows archive:
+
+```powershell
+.\install-preflight.ps1 -Archive .\preflight-0.1.2-windows-x86_64.tar.gz -Sha256 CHECKSUM_FROM_SHA256SUMS
+```
+
+On Windows, `package status`, `package rollback` and `package uninstall` use the
+same `--prefix` argument. Run uninstall from a downloaded `preflight.exe` outside
+that prefix, after stopping the installed server. User configuration and data stay.
+
 ```sh
 brew tap MaxLaneDev/preflight https://github.com/MaxLaneDev/preflight
 brew install MaxLaneDev/preflight/preflight

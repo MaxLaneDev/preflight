@@ -21,9 +21,15 @@ pub(super) async fn package(
         "package and plugin builder versions differ"
     );
     ensure!(
-        matches!(manifest.metadata["os"].as_str(), Some("macos" | "linux"))
-            && manifest.metadata["arch"] == "aarch64",
-        "stdio plugin packaging currently supports macOS/Linux ARM64 only"
+        matches!(
+            (
+                manifest.metadata["os"].as_str(),
+                manifest.metadata["arch"].as_str()
+            ),
+            (Some("macos" | "linux"), Some("aarch64"))
+                | (Some("macos" | "linux" | "windows"), Some("x86_64"))
+        ),
+        "unsupported stdio plugin platform"
     );
     ensure!(
         manifest.files[&manifest.binary].executable,
@@ -41,9 +47,10 @@ pub(super) async fn package(
         plugin["version"] == version && plugin["name"] == "preflight",
         "submission manifest version or identity differs"
     );
+    let plugin_binary = format!("bin/{}", manifest.binary);
     let mcp = json!({
         "$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-        "mcpServers":{"preflight":{"type":"stdio","command":"./bin/preflight","args":["mcp-proxy"],"cwd":"${PLUGIN_ROOT}"}}
+        "mcpServers":{"preflight":{"type":"stdio","command":format!("./{plugin_binary}"),"args":["mcp-proxy"],"cwd":"${PLUGIN_ROOT}"}}
     });
     let mut files = BTreeMap::new();
     for name in manifest.files.keys().filter(|n| {
@@ -54,7 +61,7 @@ pub(super) async fn package(
         files.insert(name.clone(), fs::read(payload.path().join(name))?);
     }
     files.insert(
-        "bin/preflight".into(),
+        plugin_binary.clone(),
         fs::read(payload.path().join(&manifest.binary))?,
     );
     files.insert("plugin.json".into(), serde_json::to_vec_pretty(&plugin)?);
@@ -106,11 +113,7 @@ pub(super) async fn package(
             &name,
             zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated)
-                .unix_permissions(if name == "bin/preflight" {
-                    0o755
-                } else {
-                    0o644
-                }),
+                .unix_permissions(if name == plugin_binary { 0o755 } else { 0o644 }),
         )?;
         zip.write_all(&bytes)?;
     }

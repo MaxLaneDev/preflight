@@ -2,8 +2,8 @@
 # Bootstrap only a checksum-verified release binary. It verifies and installs the archive.
 set -eu
 command -v curl >/dev/null 2>&1 || { echo 'curl is required.' >&2; exit 1; }
-case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; *) echo 'macOS and Linux ARM64 are supported.' >&2; exit 1;; esac
-case "$(uname -m)" in arm64|aarch64) arch=aarch64;; *) echo 'x86_64 is deferred.' >&2; exit 1;; esac
+case "$(uname -s)" in Darwin) os=macos;; Linux) os=linux;; *) echo 'Use install.ps1 on Windows; this installer supports macOS and Linux.' >&2; exit 1;; esac
+case "$(uname -m)" in arm64|aarch64) arch=aarch64;; x86_64|amd64) arch=x86_64;; *) echo 'Unsupported architecture.' >&2; exit 1;; esac
 version=${PREFLIGHT_VERSION:-latest}
 if [ "$version" = latest ]; then base=https://github.com/MaxLaneDev/preflight/releases/latest/download
 else

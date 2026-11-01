@@ -3,6 +3,7 @@ use std::{collections::BTreeSet, fs, process::Command};
 
 const ROOT_FILES: &[&str] = &[
     ".gitignore",
+    ".gitattributes",
     "Cargo.toml",
     "Cargo.lock",
     "README.md",
@@ -12,6 +13,7 @@ const ROOT_FILES: &[&str] = &[
     "PRIVACY.md",
     "preflight.example.toml",
     "install.sh",
+    "install.ps1",
 ];
 const DIRECTORIES: &[&str] = &[
     ".github",
@@ -39,6 +41,7 @@ const SCRIPTS: &[&str] = &[
     "package-codex-plugin.sh",
     "test-codex-plugin.sh",
     "test-install-sh.sh",
+    "test-windows-package.ps1",
     "test-client.sh",
     "test-client.cjs",
     "test-launchd.sh",

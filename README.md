@@ -116,8 +116,9 @@ Commands run with the server account's permissions. Run trusted projects only.
 - [Logs and search](docs/evidence.md) · [Cleanup](docs/storage-gc.md) · [Archives](docs/run-archives.md)
 - [All guides](docs/README.md)
 
-Release checks target macOS ARM64 and Linux ARM64. Windows and physical x86_64
-acceptance are deferred. Future work includes additional platforms and workers
+The 0.1.2 candidate checks macOS ARM64/x86_64, Linux ARM64/x86_64 and Windows x86_64.
+Published 0.1.1 packages cover ARM64; see [installation](docs/installation.md).
+Physical remote x86_64 worker acceptance remains separate. Future work includes workers
 that connect through NAT without inbound ports.
 
 [MIT license](LICENSE). Packages include dependency notices.

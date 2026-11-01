@@ -35,7 +35,9 @@ struct Manifest {
     entries: BTreeMap<String, Entry>,
 }
 fn private_dir(path: &Path) -> Result<()> {
-    let mut builder = std::fs::DirBuilder::new();
+    let builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    let mut builder = builder;
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;

@@ -307,6 +307,8 @@ fn quarantine(e: &Engine, plan: &str, i: u64) -> Result<PathBuf> {
 pub(crate) fn sync_directory(path: &Path) -> Result<()> {
     #[cfg(unix)]
     std::fs::File::open(path)?.sync_all()?;
+    #[cfg(not(unix))]
+    let _ = path;
     Ok(())
 }
 fn remove_approved(root: &Path, manifest: &[Removal]) -> Result<()> {

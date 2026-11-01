@@ -15,9 +15,14 @@ sh scripts/release.sh package --server target/release/preflight --destination di
 sh scripts/smoke-package.sh dist
 ```
 
-CI checks macOS/Linux ARM64. Windows and x86_64 remain deferred. A release tag must
+The 0.1.2 candidate matrix checks macOS ARM64/x86_64, Linux ARM64/x86_64 and
+Windows x86_64. A release tag must
 match the Cargo product version; the workflow creates a draft with checked packages,
 installer, plugin ZIP and SHA256SUMS. Publish only after real download/install checks.
+Windows archives use the static C runtime and include the same Web UI and MCP;
+`install.ps1` verifies the checksum and installs without administrator access.
+Native Windows acceptance checks install/reinstall, UI/API/MCP startup, refusal
+to uninstall a running server, and removal that preserves configuration and data.
 
 ## Homebrew
 

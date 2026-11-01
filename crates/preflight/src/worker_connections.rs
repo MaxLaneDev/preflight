@@ -9,10 +9,10 @@ use rmcp::schemars::{self, JsonSchema};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+#[cfg(unix)]
+use std::time::Instant;
+use std::{sync::Arc, time::Duration};
+#[cfg(unix)]
 use tokio::io::AsyncReadExt;
 
 #[derive(Deserialize, Serialize, JsonSchema)]

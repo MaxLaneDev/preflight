@@ -314,7 +314,9 @@ pub async fn recover(
     );
     let receipt = serde_json::json!({"version":1,"process_stopped":true,"job_id":job,"worker_id":state.worker_id,"gateway":state.gateway,"proof":proof,"pending":pending});
     if prior.is_none() {
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        let mut builder = builder;
         #[cfg(unix)]
         {
             use std::os::unix::fs::DirBuilderExt;

@@ -102,18 +102,16 @@ impl Spec {
         Ok(())
     }
     pub fn effective_user(&self) -> Option<String> {
-        self.user.clone().or_else(|| {
-            #[cfg(unix)]
-            {
+        #[cfg(unix)]
+        {
+            self.user.clone().or_else(|| {
                 Some(format!("{}:{}", unsafe { libc::geteuid() }, unsafe {
                     libc::getegid()
                 }))
-            }
-            #[cfg(not(unix))]
-            {
-                None
-            }
-        })
+            })
+        }
+        #[cfg(not(unix))]
+        self.user.clone()
     }
 }
 pub(crate) fn resolve_image(db: &Db, run: &str, stage: &mut StageDefinition) -> Result<()> {

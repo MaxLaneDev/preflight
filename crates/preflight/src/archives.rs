@@ -286,7 +286,9 @@ struct Manifest {
 }
 pub(crate) fn private_dir(path: &Path) -> Result<()> {
     if !path.try_exists()? {
-        let mut b = std::fs::DirBuilder::new();
+        let b = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        let mut b = b;
         #[cfg(unix)]
         {
             use std::os::unix::fs::DirBuilderExt;

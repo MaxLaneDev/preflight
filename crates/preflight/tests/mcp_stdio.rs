@@ -129,7 +129,13 @@ fn review_setup_produces_valid_patches_and_real_compiler_evidence_without_overwr
     assert!(status.status.success() && status.stdout.is_empty());
 }
 
-#[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")))]
+#[cfg(any(
+    all(target_arch = "aarch64", any(target_os = "macos", target_os = "linux")),
+    all(
+        target_arch = "x86_64",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    )
+))]
 #[tokio::test]
 async fn unpacked_stdio_plugin_uses_bundled_binary_without_path_dependencies() {
     let temp = tempfile::tempdir().unwrap();

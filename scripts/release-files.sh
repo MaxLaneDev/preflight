@@ -26,7 +26,7 @@ while IFS= read -r archive; do
  if [ -e "$destination/install-preflight.sh" ]; then cmp "$installer" "$destination/install-preflight.sh"; else cp "$installer" "$destination/install-preflight.sh"; fi
  cp "$archive" "$archive.sha256" "$destination/"
  jq -r '.metadata.os+" "+.metadata.arch' "$destination/.manifest" >> "$destination/.platforms"
- if jq -e '.metadata.arch=="aarch64" and (.metadata.os=="macos" or .metadata.os=="linux")' "$destination/.manifest" >/dev/null; then
+ if jq -e '(.metadata.arch=="aarch64" and (.metadata.os=="macos" or .metadata.os=="linux")) or (.metadata.arch=="x86_64" and (.metadata.os=="macos" or .metadata.os=="linux" or .metadata.os=="windows"))' "$destination/.manifest" >/dev/null; then
   platform=$(jq -r '.metadata.os+"-"+.metadata.arch' "$destination/.manifest")
   "$preflight_binary" package plugin-stdio "$archive" --sha256 "$sha" --repository "$root" --destination "$destination/preflight-stdio-plugin-$version-$platform.zip" >/dev/null
  fi
@@ -36,12 +36,13 @@ while IFS= read -r archive; do
  count=$((count+1))
 done < "$destination/.archives"
 cp "$root/install.sh" "$destination/install.sh"
+cp "$root/install.ps1" "$destination/install.ps1"
 plugin_version=$(jq -r '.version' "$root/integrations/codex/.codex-plugin/plugin.json")
 "$root/scripts/package-codex-plugin.sh" "$destination/preflight-codex-plugin-$plugin_version.zip" --zip >/dev/null
 {
  printf 'Preflight includes the Web UI and MCP in one server.\n\nBuilt and checked on:\n'
  sed 's/^/- /' "$destination/.platforms"
- printf '\nCheck SHA256SUMS before installation. Services are never restarted by the installer. Configuration and data stay outside the binary installation.\n\nWindows/x86_64 and NAT traversal remain deferred.\n'
+ printf '\nCheck SHA256SUMS before installation. Services are never restarted by the installer. Configuration and data stay outside the binary installation.\n\nPhysical remote worker acceptance and NAT traversal are separate from these native build checks.\n'
 } > "$destination/RELEASE_NOTES.md"
 # Include release notes in the checksums too.
 for file in "$destination"/*; do [ -f "$file" ] || continue; printf '%s  %s\n' "$(sha256 "$file")" "$(basename "$file")"; done > "$destination/.sums"

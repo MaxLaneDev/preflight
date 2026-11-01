@@ -28,9 +28,13 @@ jobs:
           archive=$(find artifacts -name '*-linux-aarch64.tar.gz')
           sh scripts/lib/extract-release-binary.sh "$archive" .validation/preflight
           PREFLIGHT_BINARY="$PWD/.validation/preflight" sh scripts/release-files.sh artifacts release-assets "$RELEASE_TAG"
+          for platform in macos-aarch64 macos-x86_64 linux-aarch64 linux-x86_64 windows-x86_64; do
+            test -f "release-assets/preflight-${RELEASE_TAG#v}-$platform.tar.gz"
+            test -f "release-assets/preflight-stdio-plugin-${RELEASE_TAG#v}-$platform.zip"
+          done
       - name: Create reviewable draft
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install-preflight.sh release-assets/SHA256SUMS release-assets/RELEASE_NOTES.md
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Preflight $RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md release-assets/*tar.gz release-assets/*sha256 release-assets/*.zip release-assets/*.rb release-assets/install.sh release-assets/install.ps1 release-assets/install-preflight.sh release-assets/SHA256SUMS release-assets/RELEASE_NOTES.md
