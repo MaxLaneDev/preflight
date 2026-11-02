@@ -14,7 +14,7 @@ Mixed read/write tools such as server settings advertise their write effects.
 Cleanup previews persist plans; they are non-destructive writes. These hints do
 not authorize calls or replace server permissions and scope checks.
 
-## Stdio clients (0.1.2+)
+## Stdio clients (0.1.3+)
 
 Start the server first. A stdio client can launch a relay to that same backend:
 

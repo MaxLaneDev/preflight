@@ -15,7 +15,7 @@ sh scripts/release.sh package --server target/release/preflight --destination di
 sh scripts/smoke-package.sh dist
 ```
 
-The 0.1.2 candidate matrix checks macOS ARM64/x86_64, Linux ARM64/x86_64 and
+The 0.1.3 candidate matrix checks macOS ARM64/x86_64, Linux ARM64/x86_64 and
 Windows x86_64. A release tag must
 match the Cargo product version; the workflow creates a draft with checked packages,
 installer, plugin ZIP and SHA256SUMS. Publish only after real download/install checks.

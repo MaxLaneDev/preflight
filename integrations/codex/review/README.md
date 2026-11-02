@@ -7,7 +7,7 @@ sh review/setup.sh /absolute/new/review-directory 49170
 preflight --config /absolute/new/review-directory/server.toml serve
 ```
 
-Use server 0.1.2 or newer. Configure the development MCP connection with the
+Use server 0.1.3 or newer. Configure the development MCP connection with the
 bundled relay and `--server http://127.0.0.1:49170/mcp`. Do not replace an active
 production connection. The setup command only creates fresh sample inputs; it
 does not start services, register workspaces or change an existing repository.
