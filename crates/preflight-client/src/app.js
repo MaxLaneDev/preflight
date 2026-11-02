@@ -131,9 +131,10 @@ function remoteChoices(select,kind,cursor=null){
  async function load(reset=false){if(loading&&!reset)return;const project=state.project,request=++generation;loading=true;select.dataset.loading='true';syncSelects();
  try{const page=await api('catalog?'+query({kind,project_id:kind==='workspaces'?null:project,query:term.trim(),after:reset?null:next,limit:25}));if(signal.aborted||request!==generation||!select.isConnected||(kind!=='workspaces'&&state.project!==project))return;
  const selected=cloneChoice(select.selectedOptions[0]),value=select.value;
- if(reset)select.replaceChildren(...(selected?[selected]:[]));
+ if(reset)select.replaceChildren(...(selected&&!value?[selected]:[]));
  for(const row of page.items){const optionValue=kind==='workspaces'?row.id:row.saved_name||row.name;if(kind==='saved_pipelines'&&!row.saved_name)continue;let option=[...select.options].find(o=>o.value===optionValue);if(!option){option=uiOption(row.name,optionValue);select.append(option);}option.dataset.revision=row.revision||1;option.dataset.search=[row.name,row.id,row.key,row.pipeline_key,row.root].filter(Boolean).join(' ');}
- if(value)select.value=value;next=page.next_cursor;select.dataset.more=String(Boolean(next));select.dataset.error='';
+ if(selected&&![...select.options].some(o=>o.value===value))select.append(selected);
+ if(selected)select.value=value;next=page.next_cursor;select.dataset.more=String(Boolean(next));select.dataset.error='';
  }catch(error){if(request===generation&&!signal.aborted)select.dataset.error=error.message;}finally{if(request===generation){loading=false;select.dataset.loading='false';syncSelects();}}}
  select.addEventListener('choices-search',event=>{term=event.detail;generation++;loading=false;next=null;select.dataset.more='false';select.dataset.error='';clearTimeout(timer);timer=setTimeout(()=>{if(!signal.aborted)load(true);},200);},{signal});
  select.addEventListener('choices-more',event=>event.detail?.waitUntil?.(load(!next)),{signal});
