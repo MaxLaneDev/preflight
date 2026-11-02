@@ -25,6 +25,10 @@ and lockfile checksums do not depend on the checkout host.
 Windows worker output bundles preserve explicitly declared executable types in
 the SHA-covered manifest; Windows has no Unix execute bit to recover from a file.
 The server still validates declared paths, types and transferred content.
+Stored worker outputs retain the verified transfer bundle, including its hashed
+execution metadata, and decode it again before collection. Versioned private
+bundle directories coexist with legacy stored trees; both formats verify their
+recorded digest. No database migration or wire protocol change is needed.
 
 `setup` retains its POSIX contract. Windows controllers can dispatch it to Linux
 workers or containers; native Windows targets reject it. Shared artifact, test

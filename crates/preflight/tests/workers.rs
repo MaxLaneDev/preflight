@@ -419,19 +419,25 @@ async fn workers_cli_connect_reconnect_auth_and_gateway_isolation() {
 
         assert_eq!(outcome["status"], expected, "{case}");
         if case == "returned-file" {
-            let directory: String = c
+            let (directory, digest): (String, String) = c
                 .query_row(
-                    "SELECT directory FROM worker_outputs WHERE job_id=?1",
+                    "SELECT directory,tree_sha256 FROM worker_outputs WHERE job_id=?1",
                     [job["job_id"].as_str().unwrap()],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .unwrap();
             let returned = f.temp.path().join("data/worker-outputs").join(directory);
+            let tree = preflight::worker_transfer::decode(
+                &mut std::fs::File::open(returned.join("bundle")).unwrap(),
+                &digest,
+                f.temp.path(),
+            )
+            .unwrap();
             assert_eq!(
-                std::fs::read_to_string(returned.join("result.txt")).unwrap(),
+                std::fs::read_to_string(tree.directory.path().join("result.txt")).unwrap(),
                 "workspace only"
             );
-            assert_eq!(std::fs::read_dir(returned).unwrap().count(), 1);
+            assert_eq!(tree.manifest.entries.len(), 1);
         }
 
         let response = mcp

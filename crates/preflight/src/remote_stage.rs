@@ -254,11 +254,7 @@ pub async fn execute(
             let parent = destination.parent().context("stage parent")?;
             let temporary = tempfile::tempdir_in(parent)?;
             let copied = temporary.path().join("tree");
-            let manifest = crate::trees::copy(&stored, &copied)?;
-            ensure!(
-                manifest.sha256()? == digest,
-                "stored worker result digest changed before collection"
-            );
+            crate::worker_outputs::copy_stored(&stored, &copied, &digest)?;
             for (path, kind) in returns {
                 let source = crate::pipeline::contained(&copied, &path)?;
                 if source.try_exists()? {

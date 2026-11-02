@@ -13,6 +13,52 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path, pin::Pin, sync::Arc, time::Duration};
 use tokio::io::AsyncWriteExt;
 
+const STORED_BUNDLE_PREFIX: &str = "bundle-v1-";
+
+fn store_bundle(root: &Path, spool: tempfile::NamedTempFile) -> Result<tempfile::TempDir> {
+    let directory = tempfile::Builder::new()
+        .prefix(STORED_BUNDLE_PREFIX)
+        .tempdir_in(root)?;
+    let file = spool.persist_noclobber(directory.path().join("bundle"))?;
+    file.sync_all()?;
+    drop(file);
+    #[cfg(unix)]
+    {
+        std::fs::File::open(directory.path())?.sync_all()?;
+        std::fs::File::open(root)?.sync_all()?;
+    }
+    Ok(directory)
+}
+
+pub(crate) fn copy_stored(stored: &Path, destination: &Path, digest: &str) -> Result<()> {
+    if stored
+        .file_name()
+        .and_then(|v| v.to_str())
+        .is_some_and(|v| v.starts_with(STORED_BUNDLE_PREFIX))
+    {
+        // Retain wire metadata: a Windows filesystem cannot store Unix execute bits.
+        let bundle = crate::pipeline::contained(stored, "bundle")?;
+        let tree = worker_transfer::decode(
+            &mut std::fs::File::open(bundle)?,
+            digest,
+            destination.parent().context("output parent")?,
+        )?;
+        ensure!(
+            std::fs::symlink_metadata(destination)
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+            "worker output destination already exists"
+        );
+        std::fs::rename(tree.directory.path(), destination)?;
+    } else {
+        let manifest = crate::trees::copy(stored, destination)?;
+        ensure!(
+            manifest.sha256()? == digest,
+            "stored worker result digest changed before collection"
+        );
+    }
+    Ok(())
+}
+
 pub fn validate_paths(paths: &BTreeMap<String, ArtifactKind>) -> Result<()> {
     ensure!(paths.len() <= 128, "too many returned worker paths");
     for path in paths.keys() {
@@ -148,31 +194,20 @@ pub async fn upload(
         if let Some(old) = old {
             ensure!(old == digest, Fault::IdempotencyConflict);
         } else {
-            let directory = tree
-                .directory
+            let retained = store_bundle(&root, spool)?;
+            let directory = retained
                 .path()
                 .file_name()
                 .context("output directory")?
                 .to_str()
                 .context("output path encoding")?;
-            // File contents were synced by decode; sync directory metadata before the DB reference.
-            #[cfg(unix)]
-            {
-                for (path, entry) in tree.manifest.entries.iter().rev() {
-                    if entry.kind == "directory" {
-                        std::fs::File::open(tree.directory.path().join(path))?.sync_all()?;
-                    }
-                }
-                std::fs::File::open(tree.directory.path())?.sync_all()?;
-                std::fs::File::open(&root)?.sync_all()?;
-            }
             authorize(&tx, &credential, &claim, &id)?;
             tx.execute(
                 "INSERT INTO worker_outputs VALUES (?1,?2,?3,?4,?5)",
                 params![id, digest, directory, size, crate::workers::now()],
             )?;
             tx.commit()?;
-            let _ = tree.directory.keep();
+            let _ = retained.keep();
             return Ok(Json(json!({"job_id":id,"tree_sha256":digest})));
         }
         tx.commit()?;
@@ -234,6 +269,50 @@ pub fn pack(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stored_bundles_keep_execution_metadata_and_verify_bytes_before_collection() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("program"), b"executable payload").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                source.join("program"),
+                std::fs::Permissions::from_mode(0o700),
+            )
+            .unwrap();
+        }
+        let paths = BTreeMap::from([("program".into(), ArtifactKind::Executable)]);
+        let (bundle, digest) = pack(&source, &paths, root.path()).unwrap();
+        let stored = store_bundle(root.path(), bundle).unwrap();
+        let copied = root.path().join("collected");
+        copy_stored(stored.path(), &copied, &digest).unwrap();
+        assert_eq!(
+            std::fs::read(copied.join("program")).unwrap(),
+            b"executable payload"
+        );
+        let verified = worker_transfer::decode(
+            &mut std::fs::File::open(stored.path().join("bundle")).unwrap(),
+            &digest,
+            root.path(),
+        )
+        .unwrap();
+        assert!(verified.manifest.entries["program"].executable);
+        assert!(copy_stored(stored.path(), &copied, &digest).is_err());
+        let mut corrupt = std::fs::read(stored.path().join("bundle")).unwrap();
+        *corrupt.last_mut().unwrap() ^= 1;
+        std::fs::write(stored.path().join("bundle"), corrupt).unwrap();
+        assert!(copy_stored(stored.path(), &root.path().join("corrupt"), &digest).is_err());
+
+        let legacy = root.path().join("legacy");
+        let manifest = crate::trees::copy(&source, &legacy).unwrap();
+        let digest = manifest.sha256().unwrap();
+        copy_stored(&legacy, &root.path().join("legacy-copy"), &digest).unwrap();
+        std::fs::write(legacy.join("unexpected"), b"changed inventory").unwrap();
+        assert!(copy_stored(&legacy, &root.path().join("legacy-corrupt"), &digest).is_err());
+    }
     #[test]
     fn selected_results_roundtrip_and_reject_unsafe_declarations() {
         let root = tempfile::tempdir().unwrap();
