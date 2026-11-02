@@ -4,7 +4,7 @@ use common::*;
 use preflight::{model::RunState, worker_jobs, worker_transfers, workers};
 use serde_json::{Value, json};
 use std::{path::Path, time::Duration};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
 fn journal(root: &Path) -> Value {
@@ -19,6 +19,50 @@ fn worker(base: &str, root: &Path, mode: &str) -> tokio::process::Command {
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
     command
+}
+
+fn command_produced_output(path: &Path, id: &str) -> bool {
+    // Observation must not migrate or lock the database that the worker is opening.
+    (|| -> rusqlite::Result<bool> {
+        let db = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        db.busy_timeout(Duration::ZERO)?;
+        db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM log_events WHERE run_id=?1 AND stream='stdout')",
+            [id],
+            |row| row.get(0),
+        )
+    })()
+    .unwrap_or(false)
+}
+
+#[test]
+fn readiness_observation_does_not_create_migrate_or_wait_for_a_writer() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("worker.sqlite3");
+    assert!(!command_produced_output(&path, "run"));
+    assert!(!path.exists());
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute_batch("CREATE TABLE log_events(run_id TEXT,stream TEXT); INSERT INTO log_events VALUES ('run','lifecycle'),('other','stdout');").unwrap();
+    assert!(!command_produced_output(&path, "run"));
+    db.execute("INSERT INTO log_events VALUES ('run','stdout')", [])
+        .unwrap();
+    assert!(command_produced_output(&path, "run"));
+    db.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    assert!(!command_produced_output(&path, "run"));
+    db.execute_batch("ROLLBACK").unwrap();
+    assert!(command_produced_output(&path, "run"));
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table'",
+            [],
+            |row| row.get::<_, u32>(0)
+        )
+        .unwrap(),
+        1
+    );
 }
 
 #[tokio::test]
@@ -118,15 +162,18 @@ async fn disconnected_worker_stops_command_and_never_reexecutes_lost_claim() {
     // Wait for command stdout, not just the pre-execution journal write.
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            if db_path.exists() {
-                let db = preflight::db::Db::new(&db_path).unwrap();
-                if db.logs(id, 0).is_ok_and(|p| {
-                    p.events
-                        .iter()
-                        .any(|e| e.text.contains("Preflight helper: stdout"))
-                }) {
-                    break;
+            if command_produced_output(&db_path, id) {
+                break;
+            }
+            if let Some(status) = child.try_wait().unwrap() {
+                let mut stderr = Vec::new();
+                if let Some(pipe) = child.stderr.take() {
+                    let _ = pipe.take(8192).read_to_end(&mut stderr).await;
                 }
+                panic!(
+                    "worker exited before command output: {status}; {}",
+                    String::from_utf8_lossy(&stderr)
+                );
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
