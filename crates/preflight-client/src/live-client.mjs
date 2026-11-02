@@ -13,3 +13,19 @@ function connect(){
 export function configureLive(value){enabled=value===true;if(!enabled)disconnect();else connect();}
 export function liveSource(){const source=new EventTarget();source.close=()=>{sources.delete(source);if(!sources.size)disconnect();};sources.add(source);connect();return source;}
 addEventListener('pagehide',disconnect);addEventListener('pageshow',connect);document.addEventListener('visibilitychange',()=>document.hidden?disconnect():connect());
+
+// Elapsed time advances locally even when a quiet build emits no SSE events.
+export function elapsedText(start,end,now=Date.now()){
+ const ms=Math.max(0,(end??now)-start);
+ const value=ms<1000?Math.round(ms)+' ms':ms<60000?(ms/1000).toFixed(1)+' s':Math.floor(ms/60000)+' min '+Math.floor(ms%60000/1000)+' s';
+ return value+' elapsed'+(end==null?' · updating':'');
+}
+export function elapsedNode(node,start,end){
+ node.dataset.elapsedStart=String(start);
+ if(end==null)delete node.dataset.elapsedEnd;else node.dataset.elapsedEnd=String(end);
+ node.textContent=elapsedText(start,end);return node;
+}
+export function tickElapsed(root=document,now=Date.now()){
+ if(document.hidden)return;
+ for(const node of root.querySelectorAll('[data-elapsed-start]:not([data-elapsed-end])'))node.textContent=elapsedText(Number(node.dataset.elapsedStart),null,now);
+}

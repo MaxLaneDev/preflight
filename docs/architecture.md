@@ -19,6 +19,10 @@ Web ─┘     │
 MCP and HTTP share engine operations and validators. The Web UI is bundled;
 `preflight-client` provides a compatibility listener. No external service is required.
 
+Browser tabs share one SSE connection through a SharedWorker. Events invalidate
+HTTP views; focused filters do not pause status updates. Elapsed timers tick
+locally, including during quiet commands. Browsers without SharedWorker use polling.
+
 SQLite stores identity, status, ownership, plans and durable events. Payloads live
 under the data directory. Leases protect active operations; uncertain state fails
 closed until recovery. Source copies isolate accidental mutation, not malicious
