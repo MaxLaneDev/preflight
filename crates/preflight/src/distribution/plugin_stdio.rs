@@ -86,7 +86,7 @@ pub(super) async fn package(
         if path.extension().is_some_and(|e| e == "md") {
             let name = format!(
                 "skills/preflight-mcp/{}",
-                path.strip_prefix(&skills)?.to_str().context("skill path")?
+                crate::pipeline::portable_relative(path.strip_prefix(&skills)?)?
             );
             ensure!(safe_name(&name), "unsafe skill path");
             files.insert(name, fs::read(path)?);

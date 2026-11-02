@@ -24,6 +24,10 @@ mkdir -p "$HOME" "$TMPDIR" "$PREFLIGHT_WORKSPACE/.tools/bin"
 # Verify the archive checksum, then unpack into .tools.
 ```
 
+`setup` targets a POSIX environment: native macOS/Linux workers or Linux
+containers. A Windows server can dispatch it to those targets. Native Windows
+commands run normally, but the POSIX `setup` field is rejected for Windows workers.
+
 Use `.` to preserve exports; ordinary setup commands are subprocesses. A failed
 step prevents the main command. Setup requires POSIX `sh`, accepts at most 16
 commands, and cannot be combined with build-cache reuse, pinned profiles or fixture adapters.

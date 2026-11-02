@@ -302,11 +302,8 @@ mod tests {
         assert!(command.program.starts_with(ROOT));
         expand(&worker, &mut command, &mut env).unwrap();
         assert_eq!(
-            command.program,
-            worker
-                .join(".preflight/inputs/build/tool")
-                .to_str()
-                .unwrap()
+            Path::new(&command.program),
+            worker.join(".preflight/inputs/build/tool")
         );
         assert_eq!(command.args[0], command.program);
         assert_eq!(env["SDK"], command.program);

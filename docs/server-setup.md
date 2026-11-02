@@ -29,6 +29,12 @@ generated configuration and token; the following manual setup is for source buil
 
 ## Source builds
 
+On Windows, install the compiler and SDK required by your project. Native build
+commands receive standard Windows installation-directory variables and linker
+search paths (`LIB`, `LIBPATH`, `INCLUDE`) without inheriting the whole server
+environment. Toolchain-specific values can also be set explicitly in stage `env`.
+These inherited values contribute hashes to cache keys and worker receipts.
+
 ## 1. Build and create an admin token
 
 For a new installation, run from the source directory. Keep an existing token and configuration.

@@ -544,6 +544,23 @@ pub fn artifact_ref(value: &str) -> Result<Option<(&str, &str)>> {
     identifier(name)?;
     Ok(Some((stage, name)))
 }
+/// Serialize an internally derived relative path without relaxing wire-path validation.
+pub(crate) fn portable_relative(path: &Path) -> Result<String> {
+    let parts = path
+        .components()
+        .map(|part| {
+            let std::path::Component::Normal(part) = part else {
+                return Err(invalid("invalid relative path"));
+            };
+            part.to_str()
+                .ok_or_else(|| invalid("relative path is not UTF-8"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let value = parts.join("/");
+    ensure!(!value.is_empty(), invalid("empty relative path"));
+    relative(&value)?;
+    Ok(value)
+}
 pub fn relative(value: &str) -> Result<PathBuf> {
     ensure!(
         value.len() <= 4096 && !value.contains(['\\', ':', '\0']),
@@ -580,4 +597,25 @@ pub fn contained(root: &Path, relative_path: &str) -> Result<PathBuf> {
         }
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    #[test]
+    fn native_relative_paths_serialize_without_weakening_wire_paths() {
+        let native = Path::new("licenses").join("crate").join("LICENSE");
+        assert_eq!(
+            portable_relative(&native).unwrap(),
+            "licenses/crate/LICENSE"
+        );
+        for invalid in ["", "../outside", "/absolute", "a:b"] {
+            assert!(portable_relative(Path::new(invalid)).is_err(), "{invalid}");
+        }
+        assert!(relative(r"a\b").is_err());
+        #[cfg(unix)]
+        assert!(portable_relative(Path::new(r"a\b")).is_err());
+        #[cfg(windows)]
+        assert_eq!(portable_relative(Path::new(r"a\b")).unwrap(), "a/b");
+    }
 }

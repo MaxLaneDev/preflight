@@ -102,7 +102,11 @@ async fn pinned_copy_sdk_module_compatibility_and_restart() {
     );
     let done = finished(&f.engine, &run.id).await;
     assert_eq!(done.status, RunState::Succeeded, "{done:?}");
-    assert!(output(&f.engine, &run.id, "stdout").contains(".preflight/modules"));
+    assert!(
+        output(&f.engine, &run.id, "stdout")
+            .replace('\\', "/")
+            .contains(".preflight/modules")
+    );
     let verified = f.engine.db.toolchain(&run.id).unwrap().unwrap();
     assert_eq!(verified.contract["host_os"], std::env::consts::OS);
     assert_eq!(verified.contract["target"], "test-native");
@@ -543,7 +547,10 @@ async fn cache_explains_different_patches_with_identical_final_source_bytes() {
     let first = launch(vec![patch("base", "final")]);
     assert_eq!(
         finished(&f.engine, &first.id).await.status,
-        RunState::Succeeded
+        RunState::Succeeded,
+        "report={:?}; stderr={}",
+        preflight::api::compact_report(&f.engine, &first.id),
+        output(&f.engine, &first.id, "stderr")
     );
     let second = launch(vec![patch("base", "middle"), patch("middle", "final")]);
     assert_eq!(

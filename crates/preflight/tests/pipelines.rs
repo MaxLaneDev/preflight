@@ -167,7 +167,11 @@ async fn artifact_handoff_uses_isolated_verified_executable_and_inputs() {
     assert!(artifacts.iter().all(|a| a.sha256.len() == 64
         && a.path.exists()
         && a.path.metadata().unwrap().permissions().readonly()));
-    assert!(output(&f.engine, &run.id, "stdout").contains(".preflight/inputs/build/worker"));
+    assert!(
+        output(&f.engine, &run.id, "stdout")
+            .replace('\\', "/")
+            .contains(".preflight/inputs/build/worker")
+    );
     assert!(output(&f.engine, &run.id, "stdout").contains("consumed artifact"));
     assert!(!f.project.root.join("payload.txt").exists());
     let report = preflight::api::compact_report(&f.engine, &run.id).unwrap();

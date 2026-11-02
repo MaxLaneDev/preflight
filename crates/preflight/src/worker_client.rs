@@ -128,9 +128,9 @@ pub async fn resume(gateway: &str, root: &Path) -> Result<()> {
     connect(gateway, root, false, false).await
 }
 
-struct StateLock(std::fs::File);
+pub(crate) struct StateLock(std::fs::File);
 impl StateLock {
-    fn acquire(path: &Path) -> std::io::Result<Self> {
+    pub(crate) fn acquire(path: &Path) -> std::io::Result<Self> {
         let file = std::fs::OpenOptions::new()
             .create(true)
             .truncate(false)

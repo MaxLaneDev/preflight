@@ -293,7 +293,13 @@ async fn workers_cli_connect_reconnect_auth_and_gateway_isolation() {
         ("failure", vec!["fail"], 5, "failed"),
         ("timeout", vec!["sleep"], 1, "timed_out"),
         ("cancel", vec!["sleep"], 15, "cancelled"),
-        ("bounded-output", vec!["flood"], 5, "succeeded"),
+        // This checks bounded output, not host disk throughput for hundreds of durable log writes.
+        (
+            "bounded-output",
+            vec!["flood"],
+            if cfg!(windows) { 30 } else { 5 },
+            "succeeded",
+        ),
         ("returned-file", vec!["write"], 5, "succeeded"),
         #[cfg(unix)]
         ("hangup", vec!["sleep"], 15, "cancelled"),
@@ -380,11 +386,18 @@ async fn workers_cli_connect_reconnect_auth_and_gateway_isolation() {
                 );
             }
         }
-        let result =
-            tokio::time::timeout(std::time::Duration::from_secs(12), child.wait_with_output())
-                .await
-                .expect("worker exits promptly")
-                .unwrap();
+        let exit_deadline = if case == "bounded-output" && cfg!(windows) {
+            37
+        } else {
+            12
+        };
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(exit_deadline),
+            child.wait_with_output(),
+        )
+        .await
+        .expect("worker exits promptly")
+        .unwrap();
         assert!(
             result.status.success(),
             "{case}: {}",

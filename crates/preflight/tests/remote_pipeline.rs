@@ -61,6 +61,7 @@ async fn queued(f: &Fixture, run: &str) {
     .expect("pipeline dispatched a worker job");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn remote_setup_tools_are_job_local_and_removed_before_worker_reuse() {
     let f = Fixture::new();
@@ -158,7 +159,7 @@ async fn remote_setup_tools_are_job_local_and_removed_before_worker_reuse() {
 #[tokio::test]
 async fn remote_stages_share_artifacts_junit_and_cancellation_with_engine() {
     let f = Fixture::new();
-    let helper = f.project.root.join("driver");
+    let helper = f.project.root.join("driver.exe");
     let compiled = std::process::Command::new("rustc")
         .args([
             concat!(env!("CARGO_MANIFEST_DIR"), "/tests/support/worker.rs"),
@@ -220,8 +221,13 @@ async fn remote_stages_share_artifacts_junit_and_cancellation_with_engine() {
     let state = f.temp.path().join("worker");
     run_worker(&base, &state, "--once", issued["enrollment_token"].as_str()).await;
     let worker = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH});
+    let setup = if cfg!(unix) {
+        json!([{"program":".","args":["./prepare.sh"]},{"program":"sh","args":["-c","test \"$PREFLIGHT_SETUP_CHECK\" = remote-ready"]}])
+    } else {
+        json!([])
+    };
     let definition: preflight::pipeline::PipelineFile = serde_json::from_value(json!({"version":1,"pipeline":{"stages":[
-        {"id":"produce","worker":worker,"setup":[{"program":".","args":["./prepare.sh"]},{"program":"sh","args":["-c","test \"$PREFLIGHT_SETUP_CHECK\" = remote-ready"]}],"command":{"program":"./driver","args":["produce"],"timeout_seconds":5},"outputs":{"payload":{"path":"payload.txt","type":"file"},"tool":{"path":"worker.exe","type":"executable"}}},
+        {"id":"produce","worker":worker,"setup":setup,"command":{"program":"./driver.exe","args":["produce"],"timeout_seconds":5},"outputs":{"payload":{"path":"payload.txt","type":"file"},"tool":{"path":"worker.exe","type":"executable"}}},
         {"id":"consume","needs":["produce"],"command":{"program":"${artifact.produce.tool}","args":["consume","${artifact.produce.payload}"],"timeout_seconds":5}},
         {"id":"tests","worker":worker,"needs":["produce"],"kind":"test","cwd":"suite","command":{"program":"${artifact.produce.tool}","args":["junit","report.xml","<testsuite><testcase name='remote case' classname='worker'/></testsuite>"],"timeout_seconds":5},"junit":["report.xml"]}
     ]}})).unwrap();
@@ -336,7 +342,7 @@ async fn remote_stages_share_artifacts_junit_and_cancellation_with_engine() {
     );
     // Exercise the ordinary engine cancellation entry point, not a direct ledger write.
     let definition = serde_json::from_value(json!({"version":1,"pipeline":{"stages":[
-        {"id":"slow","worker":worker,"command":{"program":"./driver","args":["sleep","60000"],"timeout_seconds":60}}
+        {"id":"slow","worker":worker,"command":{"program":"./driver.exe","args":["sleep","60000"],"timeout_seconds":60}}
     ]}})).unwrap();
     let run = f
         .engine
@@ -381,17 +387,17 @@ async fn remote_stages_share_artifacts_junit_and_cancellation_with_engine() {
     );
     for (stage, expected, dispatch) in [
         (
-            json!({"id":"missing_worker","worker":{"os":std::env::consts::OS,"arch":"unavailable_arch"},"command":{"program":"./driver","args":["fail"],"timeout_seconds":5}}),
+            json!({"id":"missing_worker","worker":{"os":std::env::consts::OS,"arch":"unavailable_arch"},"command":{"program":"./driver.exe","args":["fail"],"timeout_seconds":5}}),
             RunState::InfrastructureError,
             false,
         ),
         (
-            json!({"id":"missing_output","worker":worker,"command":{"program":"./driver","args":["write","actual.txt"],"timeout_seconds":5},"outputs":{"required":{"path":"missing.txt","type":"file"}}}),
+            json!({"id":"missing_output","worker":worker,"command":{"program":"./driver.exe","args":["write","actual.txt"],"timeout_seconds":5},"outputs":{"required":{"path":"missing.txt","type":"file"}}}),
             RunState::InfrastructureError,
             true,
         ),
         (
-            json!({"id":"failed_report","worker":worker,"kind":"test","command":{"program":"./driver","args":["junit","failed.xml","<testsuite><testcase name='remote failure'><failure message='expected failure'/></testcase></testsuite>"],"timeout_seconds":5},"junit":["failed.xml"]}),
+            json!({"id":"failed_report","worker":worker,"kind":"test","command":{"program":"./driver.exe","args":["junit","failed.xml","<testsuite><testcase name='remote failure'><failure message='expected failure'/></testcase></testsuite>"],"timeout_seconds":5},"junit":["failed.xml"]}),
             RunState::Failed,
             true,
         ),

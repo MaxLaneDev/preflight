@@ -23,6 +23,41 @@ pub(crate) const INHERITED_ENV: &[&str] = &[
     "TMP",
     "CARGO_HOME",
     "RUSTUP_HOME",
+    // Native Windows tool discovery needs these directories and linker search paths.
+    #[cfg(windows)]
+    "ProgramFiles",
+    #[cfg(windows)]
+    "ProgramFiles(x86)",
+    #[cfg(windows)]
+    "ProgramW6432",
+    #[cfg(windows)]
+    "ProgramData",
+    #[cfg(windows)]
+    "LOCALAPPDATA",
+    #[cfg(windows)]
+    "APPDATA",
+    #[cfg(windows)]
+    "SystemDrive",
+    #[cfg(windows)]
+    "LIB",
+    #[cfg(windows)]
+    "LIBPATH",
+    #[cfg(windows)]
+    "INCLUDE",
+    #[cfg(windows)]
+    "VSINSTALLDIR",
+    #[cfg(windows)]
+    "VCINSTALLDIR",
+    #[cfg(windows)]
+    "VCToolsInstallDir",
+    #[cfg(windows)]
+    "WindowsSdkDir",
+    #[cfg(windows)]
+    "WindowsSDKVersion",
+    #[cfg(windows)]
+    "UniversalCRTSdkDir",
+    #[cfg(windows)]
+    "UCRTVersion",
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -1,14 +1,15 @@
 #[allow(dead_code)]
 mod common;
+#[cfg(unix)]
 use common::{Fixture, finished};
-use preflight::{
-    model::RunState,
-    pipeline::{self, PipelineFile, StartPipeline},
-};
+use preflight::pipeline::{self, PipelineFile};
+#[cfg(unix)]
+use preflight::{model::RunState, pipeline::StartPipeline};
 use serde_json::json;
 fn pipeline(stages: serde_json::Value) -> PipelineFile {
     serde_json::from_value(json!({"version":1,"pipeline":{"stages":stages}})).unwrap()
 }
+#[cfg(unix)]
 #[tokio::test]
 async fn setup_installs_missing_workspace_tool_and_keeps_environment_for_main() {
     let fixture = Fixture::new();
@@ -38,6 +39,7 @@ async fn setup_installs_missing_workspace_tool_and_keeps_environment_for_main() 
             .contains("installed-tool")
     );
 }
+#[cfg(unix)]
 #[tokio::test]
 async fn setup_failure_blocks_main_and_timeout_cancels_all_setup_commands() {
     let fixture = Fixture::new();
@@ -79,6 +81,21 @@ async fn setup_failure_blocks_main_and_timeout_cancels_all_setup_commands() {
         finished(&fixture.engine, &run.id).await.status,
         RunState::TimedOut
     );
+}
+#[cfg(windows)]
+#[test]
+fn setup_requires_a_posix_target_instead_of_a_posix_controller() {
+    let mut definition = pipeline(
+        json!([{"id":"test","setup":[{"program":"sh","args":["prepare.sh"]}],"command":{"program":"tool"}}]),
+    );
+    let error = pipeline::validate(&definition).unwrap_err().to_string();
+    assert!(error.contains("POSIX"));
+    definition.pipeline.stages[0].worker = Some(preflight::remote_stage::Selector {
+        os: "linux".into(),
+        arch: "x86_64".into(),
+        worker_id: None,
+    });
+    pipeline::validate(&definition).unwrap();
 }
 #[test]
 fn setup_and_image_references_have_strict_contracts() {

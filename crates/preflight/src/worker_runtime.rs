@@ -108,13 +108,7 @@ pub fn save(root: &Path, mut value: Policy) -> Result<()> {
     if let Ok(meta) = std::fs::symlink_metadata(root.join("client.lock")) {
         ensure!(!meta.is_symlink(), "worker lock must not be a symlink");
     }
-    let lock = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(root.join("client.lock"))?;
-    fs2::FileExt::try_lock_exclusive(&lock)
+    let _lock = crate::worker_client::StateLock::acquire(&root.join("client.lock"))
         .context("stop the worker before changing its runtime policy")?;
     if root.join("identity.json").exists() {
         let state: serde_json::Value =
@@ -148,7 +142,7 @@ mod tests {
         }
         assert!(load(&root).unwrap().is_none());
         let policy = Policy {
-            docker_command: std::env::current_exe().unwrap(),
+            docker_command: std::env::current_exe().unwrap().canonicalize().unwrap(),
             max_memory_mib: 1024,
         };
         save(&root, policy.clone()).unwrap();
@@ -159,12 +153,7 @@ mod tests {
             policy.config(&root, 512).unwrap().default_stage_memory_mib,
             512
         );
-        let lock = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(root.join("client.lock"))
-            .unwrap();
-        fs2::FileExt::try_lock_exclusive(&lock).unwrap();
+        let lock = crate::worker_client::StateLock::acquire(&root.join("client.lock")).unwrap();
         save(&root, policy.clone()).unwrap();
         let mut changed = policy.clone();
         changed.max_memory_mib = 512;

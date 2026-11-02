@@ -223,6 +223,8 @@ pub(crate) struct Scan {
 }
 fn normalize_file(file: &str, root: &str, workspace: &str, stage: &str) -> String {
     let file = file.replace('\\', "/");
+    let root = root.replace('\\', "/");
+    let workspace = workspace.replace('\\', "/");
     for prefix in [
         format!("{workspace}/stages/{stage}/"),
         format!("{workspace}/source/"),
@@ -507,6 +509,15 @@ mod tests {
     use super::*;
     #[test]
     fn compiler_formats_and_stable_location_normalization() {
+        assert_eq!(
+            normalize_file(
+                r"C:\runs\one/stages/build/src/main.rs",
+                r"C:\project",
+                r"C:\runs\one",
+                "build"
+            ),
+            "src/main.rs"
+        );
         let clang = parse(
             "C:\\src\\main.cpp:12:3: error: unknown type name 'thing'",
             1,

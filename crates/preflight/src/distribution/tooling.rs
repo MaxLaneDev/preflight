@@ -98,10 +98,7 @@ fn licenses(root: &Path, files: &mut BTreeMap<String, Vec<u8>>) -> Result<Vec<Va
                 .context("license filename")?
                 .to_string_lossy()
                 .to_lowercase();
-            let relative = path
-                .strip_prefix(parent)?
-                .to_str()
-                .context("license path")?;
+            let relative = crate::pipeline::portable_relative(path.strip_prefix(parent)?)?;
             if (["license", "licence", "copying", "notice"]
                 .iter()
                 .any(|p| filename.starts_with(p))
@@ -340,9 +337,9 @@ fn plugin(root: &Path, destination: &Path, zipped: bool) -> Result<Value> {
             .open(destination)?;
         let mut zip = zip::ZipWriter::new(file);
         for path in walk(&plugin)? {
-            let name = path.strip_prefix(&plugin)?.to_str().context("ZIP path")?;
+            let name = crate::pipeline::portable_relative(path.strip_prefix(&plugin)?)?;
             zip.start_file(
-                name,
+                &name,
                 zip::write::SimpleFileOptions::default()
                     .compression_method(zip::CompressionMethod::Deflated)
                     .unix_permissions(if name.ends_with(".sh") { 0o755 } else { 0o644 }),

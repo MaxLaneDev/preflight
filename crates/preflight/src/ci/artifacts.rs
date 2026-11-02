@@ -117,9 +117,7 @@ fn checked(e: &Engine, path: &Path) -> Result<()> {
         .map_err(|_| invalid("CI artifact path escapes storage"))?;
     crate::pipeline::contained(
         &e.config.data_dir,
-        relative
-            .to_str()
-            .ok_or_else(|| invalid("CI artifact path is not UTF-8"))?,
+        &crate::pipeline::portable_relative(relative)?,
     )?;
     Ok(())
 }
@@ -284,9 +282,7 @@ pub fn file(e: &Engine, r: &ArtifactFile) -> Result<(Vec<u8>, String)> {
         .map_err(|_| invalid("CI artifact path escapes storage"))?;
     crate::pipeline::contained(
         &e.config.data_dir,
-        relative
-            .to_str()
-            .ok_or_else(|| invalid("CI artifact path is not UTF-8"))?,
+        &crate::pipeline::portable_relative(relative)?,
     )?;
     let bytes = read(&path)?;
     ensure!(
