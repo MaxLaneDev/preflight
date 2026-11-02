@@ -11,7 +11,7 @@
 | Disk pressure | ENOSPC recovery on an owned 64 MiB HFS+ image; scoped watermark cleanup |
 | Shell scripts / distribution | Shell/Rust install, release and MCP checks pass with Node blocked; browser tests retain Node |
 | Public releases / Homebrew | v0.1.3 published; five native targets, six published installer checks, macOS ARM64 HTTPS/Homebrew install and upgrade checked |
-| Public plugin directory | Not submitted; eligibility/review pending |
+| Plugin distribution | GitHub release packages; public OpenAI directory publication cancelled by the author |
 
 [Native build checks](https://github.com/MaxLaneDev/preflight/actions/runs/41440287016)
 and [published installer checks](https://github.com/MaxLaneDev/preflight/actions/runs/41445920481) passed.

@@ -3,9 +3,25 @@ use crate::{db::Db, engine::Engine, model::invalid};
 use anyhow::{Result, ensure};
 use rmcp::schemars::{self, JsonSchema};
 use rusqlite::{OptionalExtension, params};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
+#[cfg(unix)]
+mod desktop;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryMode {
+    Immediate,
+    Queued,
+}
+pub fn policy(config: &crate::config::Config) -> Value {
+    json!({"configured_mode":config.codex_delivery_mode,"effective_mode":config.codex_delivery_mode.unwrap_or(if config.codex_ipc_socket.is_some(){DeliveryMode::Immediate}else{DeliveryMode::Queued}),"resume_idle":config.codex_delivery_mode==Some(DeliveryMode::Immediate),"desktop_ipc_configured":config.codex_ipc_socket.is_some(),"enabled":config.codex_command.is_some(),"setting":"codex_delivery_mode","configure_tool":"server_settings"})
+}
+pub fn status(engine: &Engine, run: &str) -> Result<Value> {
+    let mut value = engine.db.codex_bindings(run)?;
+    value["delivery_policy"] = policy(&engine.current_config());
+    Ok(value)
+}
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Bind {
@@ -112,7 +128,7 @@ impl Db {
             id,
             thread_id: thread,
             message: format!(
-                "Preflight completion hook: {payload}\nRead this run's results through Preflight MCP and continue the user's existing task if still applicable. This message reports a completion, not a new task scope. Do not repeat work for the same delivery_id."
+                "Preflight completion hook: {payload}\nRead this run's results through Preflight MCP and continue the user's existing task if still applicable. This message reports a completion, not a new task scope. Do not resume user-paused work. Do not repeat work for the same delivery_id."
             ),
         }))
     }
@@ -127,25 +143,70 @@ impl Db {
 }
 pub async fn deliver(engine: &Engine, delivery: &Delivery) -> Result<()> {
     let config = engine.current_config();
-    let command = config
-        .codex_command
-        .as_ref()
-        .ok_or_else(|| invalid("Codex delivery disabled"))?;
-    deliver_configured(engine, delivery, command).await
+    deliver_configured(engine, delivery, &config).await
 }
 async fn deliver_configured(
     engine: &Engine,
     delivery: &Delivery,
-    command: &std::path::Path,
+    config: &crate::config::Config,
 ) -> Result<()> {
-    let child = tokio::process::Command::new(command)
-        .args([
-            "queue",
-            "--thread",
-            &delivery.thread_id,
-            "--message",
-            &delivery.message,
-        ])
+    let command = config
+        .codex_command
+        .as_deref()
+        .ok_or_else(|| invalid("Codex delivery disabled"))?;
+    if config.codex_delivery_mode == Some(DeliveryMode::Queued) {
+        return queue_cli(engine, delivery, command, false).await;
+    }
+    let resume_idle = config.codex_delivery_mode == Some(DeliveryMode::Immediate);
+    #[cfg(unix)]
+    if let Some(socket) = &config.codex_ipc_socket {
+        let stopped = async {
+            while !engine.is_stopping() {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        };
+        let outcome = tokio::select! {
+            result = tokio::time::timeout(std::time::Duration::from_secs(15), desktop::steer(socket, delivery)) => result.unwrap_or_else(|_| Err(anyhow::anyhow!("desktop IPC timed out"))),
+            _ = stopped => Err(anyhow::anyhow!("server stopping")),
+        };
+        return match outcome {
+            Ok(true) => engine.db.finish_codex(&delivery.id, "delivered", None),
+            Ok(false) if !engine.is_stopping() => {
+                queue_cli(engine, delivery, command, resume_idle).await
+            }
+            result => engine.db.finish_codex(
+                &delivery.id,
+                "uncertain",
+                Some(&format!(
+                    "Codex desktop delivery failed: {}; acceptance unknown",
+                    result
+                        .err()
+                        .map_or_else(|| "server stopping".into(), |error| error.to_string())
+                )),
+            ),
+        };
+    }
+    queue_cli(engine, delivery, command, resume_idle).await
+}
+
+async fn queue_cli(
+    engine: &Engine,
+    delivery: &Delivery,
+    command: &std::path::Path,
+    resume: bool,
+) -> Result<()> {
+    let mut process = tokio::process::Command::new(command);
+    process.args([
+        "queue",
+        "--thread",
+        &delivery.thread_id,
+        "--message",
+        &delivery.message,
+    ]);
+    if resume {
+        process.arg("--resume");
+    }
+    let child = process
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -199,7 +260,7 @@ pub async fn dispatch_once(engine: &Engine) -> Result<Option<Value>> {
     let Some(delivery) = engine.db.claim_codex()? else {
         return Ok(None);
     };
-    deliver_configured(engine, &delivery, config.codex_command.as_ref().unwrap()).await?;
+    deliver_configured(engine, &delivery, &config).await?;
     Ok(Some(engine.db.codex_binding(&delivery.id)?))
 }
 pub async fn run(engine: Arc<Engine>) {

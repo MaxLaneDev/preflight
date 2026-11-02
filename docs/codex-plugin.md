@@ -27,9 +27,8 @@ Installation never grants trust. SessionStart adds a brief workflow reminder;
 UserPromptSubmit validates completion messages. Neither approves tools or starts builds.
 [Completion delivery](codex-completion-hook.md) is separate.
 
-Public directory submission is pending. OpenAI does not accept lifecycle hooks
-in submitted ZIPs and requires eligibility for local MCP plugins.
-[Official requirements](https://developers.openai.com/plugins/deploy/submission).
+Distribution uses the project's GitHub releases and a local Codex marketplace.
+No public OpenAI directory submission is planned.
 
 ## Build a hook-free stdio package (0.1.3+)
 
@@ -52,11 +51,6 @@ Linux ARM64/x86_64 and Windows x86_64. Use a matching archive; Windows uses
 `./bin/preflight.exe`. The input checksum and package contents
 are verified before writing the ZIP. Existing destinations are never replaced.
 
-This command builds a package; it does not submit or publish it. OpenAI approval
-for local MCP and a clean installation check in the target desktop client are
-still required. A successful CLI relay test alone is not directory acceptance.
+This command builds a package for local installation; it does not publish it.
 
-Listing metadata and five positive/three negative review cases are maintained in
-`integrations/codex/submission.json`. The ZIP contains isolated C review fixtures;
-see its `review/README.md`. A recorded demo and review-prompt outcomes are still
-required before directory submission. The demo is currently deferred.
+The ZIP contains isolated C verification fixtures; see its `review/README.md`.

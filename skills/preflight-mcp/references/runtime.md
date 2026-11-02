@@ -83,3 +83,13 @@ is an internal acknowledgement, not a logs_read cursor. runs_worker_jobs include
 log_bytes and log_truncated. A storage limit closes forwarding with a visible marker,
 not a build cancellation. Legacy workers keep bounded completion snapshots. A lost
 job's accepted output remains readable; do not replay its command to recover logs.
+
+Codex delivery (protocol 1.73+): `server_settings` can hot-reload
+`configuration.codex_delivery_mode=queued|immediate`; preserve the full `saved`
+configuration and pass its revision and administrative credential. `queued` never
+steers/resumes. `immediate` requires private Unix desktop IPC, steers the active
+owner, or requests idle continuation with `codex queue --resume` only after a
+definite no-owner/idle response. Unknown acceptance is never resent. Omission
+retains legacy behavior. Read `codex_hook_status.delivery_policy` for current
+policy; it is not a historical receipt or proof the model answered. Bind only
+the user-authorized originating chat; delivery does not authorize new work.

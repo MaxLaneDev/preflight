@@ -20,6 +20,14 @@ test('loopback addresses, required fields, paths and admission limits fail befor
  assert(validateSettings({...base,codex_command:'codex --foo'}).codex_command);
  assert.deepEqual(validateSettings({...base,data_dir:'/home/user/My Data',allowed_roots:['/home/user/My Projects']}),{});
 });
+test('completion delivery accepts only supported modes and requires desktop transport for immediate mode',()=>{
+ assert.deepEqual(validateSettings({...base,codex_delivery_mode:'queued'}),{});
+ assert(validateSettings({...base,codex_delivery_mode:'invalid'}).codex_delivery_mode);
+ assert(validateSettings({...base,codex_delivery_mode:'immediate'}).codex_ipc_socket);
+ assert(validateSettings({...base,codex_delivery_mode:'immediate',codex_ipc_socket:'/private/codex.sock'}).codex_command);
+ assert.deepEqual(validateSettings({...base,codex_delivery_mode:'immediate',codex_command:'/usr/local/bin/codex',codex_ipc_socket:'/private/codex.sock'}),{});
+ assert(validateSettings({...base,codex_command:'/usr/local/bin/codex',codex_ipc_socket:'relative.sock'}).codex_ipc_socket);
+});
 test('retention policies enforce names, project selection and bounded integer units',()=>{
  const p={category:'stage_workspaces',name:'weekly',project_id:'01a181b1-eacd-7661-8b99-a38b5ee6e4f6',ttl_seconds:604800,interval_seconds:3600,batch_limit:25};
  assert.deepEqual(validatePolicies([p]),[{}]);

@@ -867,7 +867,7 @@ async fn codex_hook_status(
     State(e): State<Arc<Engine>>,
     Query(r): Query<RunId>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    Ok(Json(e.db.codex_bindings(&r.run_id)?))
+    Ok(Json(crate::codex_bridge::status(&e, &r.run_id)?))
 }
 async fn codex_hook_disable(
     State(e): State<Arc<Engine>>,

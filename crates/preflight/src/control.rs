@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 pub const PROTOCOL_MAJOR: u32 = 1;
-pub const PROTOCOL_MINOR: u32 = 72;
+pub const PROTOCOL_MINOR: u32 = 73;
 pub const PROTOCOL_PATCH: u32 = 0;
-pub const PROTOCOL_VERSION: &str = "1.72.0";
+pub const PROTOCOL_VERSION: &str = "1.73.0";
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectId {
@@ -148,6 +148,8 @@ pub fn capabilities(e: &Engine) -> Value {
     features["module_retention"] = true.into();
     features["module_pins"] = true.into();
     features["codex_completion_bridge"] = true.into();
+    features["codex_delivery_modes"] = true.into();
+    features["codex_delivery_policy"] = crate::codex_bridge::policy(&config);
     features["codex_delivery_configured"] = config.codex_command.is_some().into();
     json!({"product":"preflight","version":env!("CARGO_PKG_VERSION"),"schema_version":crate::migrations::VERSION,"service_language":"en","data_language":"original","preflight_protocol":{"version":PROTOCOL_VERSION,"major":PROTOCOL_MAJOR,"minor":PROTOCOL_MINOR,"patch":PROTOCOL_PATCH,"compatibility":"same major, server minor >= required minor; additive fields must be ignored","transport_version":"negotiated independently by MCP initialize"},"migration_system":{"version":1,"checksums":"sha256","policy":"forward-only, transactional, contiguous; legacy adoption marked"},"transport":"streamable_http","execution":{"mode":"local_native","executors":["native","docker"],"docker_enabled":config.docker_command.is_some(),"container_scope":"local daemon and private stage-root mount; no native fallback","os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"max_parallel_commands":config.max_parallel_commands},"configuration":{"saved_pipelines":true,"immutable_revisions":true,"optimistic_writes":true,"project_roots":"operator_allowlist","export":"pipeline_get returns definition JSON"},"features":features,"limits":{"sse_connections":crate::live::MAX_STREAMS,"archive_file_bytes":1073741824,"archive_entries":50000,"archive_metadata_bytes":16777216,"archive_creators":1,"definition_bytes":65536,"stages":32,"active_runs":config.max_active_runs,"run_page":100},"schema_uri":"/api/v1/pipeline-schema"})
 }

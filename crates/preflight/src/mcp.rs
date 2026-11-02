@@ -218,7 +218,7 @@ impl Mcp {
         result(crate::storage_policy::status(&self.engine))
     }
     #[tool(
-        description = "Bind a selected run to its originating Codex thread UUID. On completion the configured local Codex CLI queues one message to that thread. Requires user authorization for this target. Repeated binding is idempotent; disabled bindings remain disabled."
+        description = "Bind a selected run to its originating Codex thread UUID. server_settings codex_delivery_mode=queued never steers/resumes; immediate uses private desktop IPC for an active turn and requests CLI resume when idle. Omission preserves legacy behavior. Requires user authorization for this target. Repeated binding is idempotent; disabled bindings remain disabled."
     )]
     fn codex_hook_bind(
         &self,
@@ -227,13 +227,13 @@ impl Mcp {
         result(crate::codex_bridge::bind(&self.engine, &r))
     }
     #[tool(
-        description = "Inspect Codex completion hook bindings for a run, including delivery attempts and uncertain outcomes. Delivered means CLI success, not proof that a model processed the message."
+        description = "Inspect Codex completion hook bindings and the current delivery_policy (not a historical receipt), including attempts and uncertain outcomes. Delivered means CLI success, not proof that a model processed the message."
     )]
     fn codex_hook_status(
         &self,
         Parameters(r): Parameters<RunId>,
     ) -> Result<CallToolResult, ErrorData> {
-        result(self.engine.db.codex_bindings(&r.run_id))
+        result(crate::codex_bridge::status(&self.engine, &r.run_id))
     }
     #[tool(
         description = "Disable a pending/failed/uncertain Codex completion binding while preserving audit history. A currently sending binding returns busy; already delivered messages cannot be withdrawn."
@@ -438,7 +438,7 @@ impl Mcp {
         result(crate::releases::request(&self.engine, q).await)
     }
     #[tool(
-        description = "Admin-only server settings. Read or hot-reload using admin_token and expected_revision. Never include credentials in logs."
+        description = "Admin-only server settings. Read or hot-reload using admin_token and expected_revision. configuration.codex_delivery_mode selects queued or immediate (Unix desktop IPC required); omission preserves legacy behavior. Never include credentials in logs."
     )]
     fn server_settings(
         &self,

@@ -37,8 +37,12 @@ found and mention truncation when it prevents a conclusion.
 
 Use project-scoped completion events/cursors or an authorized originating-thread Codex
 hook instead of long polling loops. A queue's individual runs can be bound once their
-IDs appear; there is currently no queue-level completion hook. A delivered hook is a
-CLI acknowledgement, not proof the model consumed it. Do not send unrelated chats.
+IDs appear; there is currently no queue-level completion hook. Protocol 1.73 adds
+`server_settings.configuration.codex_delivery_mode`: `queued` never wakes/steers;
+`immediate` uses private desktop IPC and requests idle continuation. Omission keeps
+legacy behavior. Read `codex_hook_status.delivery_policy`; retain delivery_id for
+deduplication. Acceptance is not proof the model answered. Never resume user-paused
+work or send unrelated chats. See [runtime](references/runtime.md) for prerequisites.
 
 Cancel a selected run with pipeline_cancel, or the selected queue with queue_cancel.
 Cache invalidation is separate from physical deletion; unpinning never deletes a module.

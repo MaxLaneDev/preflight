@@ -29,7 +29,9 @@ export const settingsGroups = [
  ['Workers and completion hooks', [
   {key:'ssh_command',label:'SSH executable',type:'text',example:'/usr/bin/ssh',format:'Absolute server file path. Empty = managed SSH connections disabled.',help:'SSH client used to connect to remote computers. Hosts, keys and reconnect policies are configured per connection.'},
   {key:'worker_launcher',label:'Worker launcher executable',type:'text',example:'/path/to/preflight',format:'Absolute server file path. Empty = use the running Preflight executable.',help:'Preflight executable that launches worker installation over SSH. Remote platform compatibility is checked during bootstrap.'},
-  {key:'codex_command',label:'Codex executable',type:'text',example:'/opt/homebrew/bin/codex',format:'Absolute server file path. Empty = Codex completion delivery disabled.',help:'Delivers completion events to an explicitly bound Codex chat. Each run still needs its own hook binding.'}
+  {key:'codex_command',label:'Codex executable',type:'text',example:'/opt/homebrew/bin/codex',format:'Absolute server file path. Empty = Codex completion delivery disabled.',help:'Delivers completion events to an explicitly bound Codex chat. Each run still needs its own hook binding.'},
+  {key:'codex_delivery_mode',label:'Completion delivery',type:'select',options:[['','Keep existing behavior'],['queued','Queue messages'],['immediate','Deliver immediately']],example:'queued',format:'Queued or immediate. Empty preserves the existing IPC/queue behavior.',help:'Queue messages without waking the chat, or deliver to its active turn and request continuation when idle. Changes apply to subsequent deliveries; accepted messages are not resent.'},
+  {key:'codex_ipc_socket',label:'Codex desktop IPC socket',type:'text',example:'/Users/you/.codex/ipc/ipc.sock',format:'Absolute private Unix socket path. Required for immediate delivery.',help:'Routes completion context to the originating chat owner. The socket, parent directory and peer must belong to the server user. No agent/model settings are changed.'}
  ]]
 ];
 
@@ -47,11 +49,14 @@ export function validateSettings(values){
   const v=values[field.key],empty=v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length);
   if(empty){if(field.required)errors[field.key]='Enter a value.';continue;}
   if(field.type==='number'&&(!Number.isSafeInteger(Number(v))||Number(v)<field.min||Number(v)>(field.max||Number.MAX_SAFE_INTEGER)))errors[field.key]=field.max?'Enter a whole number from 1 to '+field.max+'.':'Enter a positive whole number within the safe integer range.';
+  if(field.type==='select'&&!field.options.some(([value])=>value===v))errors[field.key]='Choose one of the listed values.';
   if(['bind','worker_bind'].includes(field.key)&&!address(v))errors[field.key]='Use a loopback IP and port 1–65535, for example 127.0.0.1:4170 or [::1]:4170.';
-  if(['ssh_command','worker_launcher','codex_command','docker_command'].includes(field.key)&&!(/^(?:\/|[A-Za-z]:[\\/]|\\\\[^\\]+\\)/.test(v)))errors[field.key]='Enter an absolute server path, such as /usr/bin/ssh or C:\\Windows\\System32\\OpenSSH\\ssh.exe.';
+  if(['ssh_command','worker_launcher','codex_command','docker_command','codex_ipc_socket'].includes(field.key)&&!(/^(?:\/|[A-Za-z]:[\\/]|\\\\[^\\]+\\)/.test(v)))errors[field.key]='Enter an absolute server path, such as /usr/bin/ssh or C:\\Windows\\System32\\OpenSSH\\ssh.exe.';
   if((field.type==='text'||field.type==='lines')&&(Array.isArray(v)?v:[v]).some(p=>/[\x00-\x1f]/.test(p)||p.startsWith('~')||p.includes('://')))errors[field.key]='Use a server path or address, without a URL, control characters or ~ expansion.';
  }
  if(values.worker_bind&&address(values.bind)&&address(values.bind)===address(values.worker_bind))errors.worker_bind='Choose a different address or port from API / MCP.';
+ if(values.codex_delivery_mode==='immediate'&&!values.codex_ipc_socket)errors.codex_ipc_socket='Immediate delivery requires the private Codex desktop IPC socket on a Unix server.';
+ if(values.codex_ipc_socket&&!values.codex_command)errors.codex_command='Configure the Codex executable for idle-chat delivery.';
  if(values.memory_budget_mib&&Number(values.default_stage_memory_mib)>Number(values.memory_budget_mib))errors.default_stage_memory_mib='Default stage memory must not exceed the scheduling memory budget.';
  return errors;
 }
@@ -110,10 +115,11 @@ export function renderSettings({target,data,token,el,button,api,remoteChoices,is
  }
 
  function field(parent,definition,value,prefix='setting'){
-  const {key,label,type='text',help,format,example,required=false,min,max}=definition;
+  const {key,label,type='text',help,format,example,required=false,min,max,options=[]}=definition;
   const wrapper=el('div',undefined,'settings-field'),id=prefix+'-'+key;
   const caption=el('label',label);caption.htmlFor=id;
   const input=el(type==='lines'?'textarea':type==='select'?'select':'input');input.id=id;input.name=key;
+  if(type==='select')for(const [value,label]of options)input.append(new Option(label,value));
   if(type!=='lines'&&type!=='select')input.type=type;
   if(type==='lines')input.rows=3;
   input.value=Array.isArray(value)?value.join('\n'):value??'';input.required=required;
@@ -136,6 +142,7 @@ export function renderSettings({target,data,token,el,button,api,remoteChoices,is
    if(def.key==='admin_token_file'&&!data.admin_token_file_supported)continue;
    if(def.key==='min_free_disk_bytes'&&!data.disk_admission)continue;
    if(def.key==='max_storage_mib'&&!data.storage_size_admission)continue;
+   if(['codex_delivery_mode','codex_ipc_socket'].includes(def.key)&&!data.codex_delivery_modes)continue;
    const control=field(group,def,values[def.key]);controls.set(def.key,control);
    if(hot&&data.reload.immutable_fields.includes(def.key)){
     control.input.readOnly=true;control.wrapper.classList.add('settings-startup-only');

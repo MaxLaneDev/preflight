@@ -1188,6 +1188,8 @@ mod lock_tests {
             ci_sources: Vec::new(),
             default_stage_memory_mib: 256,
             codex_command: None,
+            codex_ipc_socket: None,
+            codex_delivery_mode: None,
             version: 1,
             storage_policies: vec![],
             max_active_runs: 32,

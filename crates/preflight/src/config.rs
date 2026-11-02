@@ -42,6 +42,12 @@ pub struct Config {
     /// Operator-controlled executable; absent means no Codex message delivery.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_command: Option<PathBuf>,
+    /// Optional operator-selected private desktop IPC socket for immediate active-chat delivery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_ipc_socket: Option<PathBuf>,
+    /// Omission preserves legacy IPC-when-configured, queue-only otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_delivery_mode: Option<crate::codex_bridge::DeliveryMode>,
     pub version: u32,
     pub bind: SocketAddr,
     pub data_dir: PathBuf,
@@ -84,6 +90,22 @@ impl Config {
     }
 
     pub fn validate_memory(&self) -> Result<()> {
+        if self.codex_delivery_mode == Some(crate::codex_bridge::DeliveryMode::Immediate) {
+            ensure!(
+                cfg!(unix) && self.codex_ipc_socket.is_some(),
+                "immediate Codex delivery requires codex_ipc_socket on a Unix server"
+            );
+        }
+        if let Some(socket) = &self.codex_ipc_socket {
+            ensure!(
+                cfg!(unix) && socket.is_absolute(),
+                "codex_ipc_socket requires an absolute Unix socket path"
+            );
+            ensure!(
+                self.codex_command.is_some(),
+                "codex_ipc_socket requires codex_command for idle-chat delivery"
+            );
+        }
         if let Some(repository) = &self.release_repository {
             crate::releases::validate(repository)?;
         }

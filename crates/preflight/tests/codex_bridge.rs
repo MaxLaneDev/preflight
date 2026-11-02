@@ -62,6 +62,14 @@ impl Fixture {
             ci_sources: Vec::new(),
             default_stage_memory_mib: 256,
             codex_command: Some(command.clone()),
+            codex_delivery_mode: match mode {
+                "desktop-queued" => Some(codex_bridge::DeliveryMode::Queued),
+                "desktop-immediate" => Some(codex_bridge::DeliveryMode::Immediate),
+                _ => None,
+            },
+            codex_ipc_socket: mode
+                .starts_with("desktop-")
+                .then(|| temp.path().join("ipc.sock")),
         })
         .unwrap();
         let project = engine.db.register("p", temp.path()).unwrap();
@@ -132,7 +140,347 @@ async fn hook_waits_for_completion_queues_once_and_preserves_arguments() {
     assert!(calls.contains("01a17f49-a837-7553-a343-bf597124dae1"));
     assert!(calls.contains("selected-run"));
     assert!(calls.contains("delivery_id"));
+    assert!(calls.contains(binding["binding_id"].as_str().unwrap()));
+    assert!(!calls.contains("--resume"));
     assert_eq!(f.bind()["state"], "delivered");
+}
+
+#[cfg(unix)]
+async fn desktop_mock(f: &Fixture, mode: &'static str) -> tokio::task::JoinHandle<()> {
+    use std::os::unix::fs::PermissionsExt;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    std::fs::set_permissions(f.temp.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = f.temp.path().join("ipc.sock");
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let root = f.temp.path().to_path_buf();
+    tokio::spawn(async move {
+        let (mut stream, _) =
+            tokio::time::timeout(std::time::Duration::from_secs(3), listener.accept())
+                .await
+                .unwrap()
+                .unwrap();
+        let mut source = String::new();
+        for ordinal in 0..3 {
+            let count = stream.read_u32_le().await.unwrap();
+            let mut bytes = vec![0; count as usize];
+            stream.read_exact(&mut bytes).await.unwrap();
+            let request: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            let result = match ordinal {
+                0 => {
+                    assert_eq!(request["params"]["clientType"], "preflight");
+                    serde_json::json!({"clientId":"sender"})
+                }
+                1 => {
+                    assert_eq!(request["method"], "thread-owner-discovery");
+                    assert_eq!(
+                        request["params"]["conversationId"],
+                        "01a17f49-a837-7553-a343-bf597124dae1"
+                    );
+                    serde_json::json!({"supportsUntrustedAppInput":true})
+                }
+                _ => {
+                    assert_eq!(request["method"], "thread-follower-steer-turn");
+                    assert_eq!(request["targetClientId"], "owner");
+                    let p = &request["params"];
+                    assert_eq!(p["input"][0]["text_elements"], serde_json::json!([]));
+                    assert!(
+                        p["input"][0]["text"]
+                            .as_str()
+                            .unwrap()
+                            .contains("without pausing or replacing")
+                    );
+                    assert_eq!(
+                        p["additionalContext"]["preflight_completion"]["name"],
+                        "preflight_completion"
+                    );
+                    assert_eq!(p["conversationId"], "01a17f49-a837-7553-a343-bf597124dae1");
+                    assert_eq!(p["clientUserMessageId"], p["restoreMessage"]["id"]);
+                    assert_eq!(
+                        p["additionalContext"]["preflight_completion"]["kind"],
+                        "untrusted"
+                    );
+                    assert!(p.get("model").is_none() && p.get("serviceTier").is_none());
+                    assert!(
+                        p["additionalContext"]["preflight_completion"]["value"]
+                            .as_str()
+                            .unwrap()
+                            .contains("selected-run")
+                    );
+                    std::fs::write(
+                        root.join("native-call"),
+                        serde_json::to_vec(&request).unwrap(),
+                    )
+                    .unwrap();
+                    if mode == "desktop-lost" {
+                        return;
+                    }
+                    serde_json::json!({"result":{"turnId":"active-turn"}})
+                }
+            };
+            let mut response = serde_json::json!({"type":"response","requestId":request["requestId"],"method":request["method"],"resultType":"success","handledByClientId":if ordinal==0 {"sender"}else{"owner"},"result":result});
+            if (mode == "desktop-no-owner" && ordinal == 1)
+                || (mode == "desktop-idle" && ordinal == 2)
+                || (mode == "desktop-rejected" && ordinal == 2)
+            {
+                response["resultType"] = serde_json::json!("error");
+                response["error"] = serde_json::json!(match mode {
+                    "desktop-no-owner" => "no-client-found",
+                    "desktop-idle" =>
+                        "Cannot steer conversation 01a17f49-a837-7553-a343-bf597124dae1 because its active turn already ended",
+                    _ => "request-timeout",
+                });
+            }
+            if ["desktop-wrong-owner", "desktop-wrong-idle"].contains(&mode) && ordinal == 2 {
+                response["handledByClientId"] = serde_json::json!("other-owner");
+                if mode == "desktop-wrong-idle" {
+                    response["resultType"] = serde_json::json!("error");
+                    response["error"] = serde_json::json!(
+                        "Cannot steer conversation 01a17f49-a837-7553-a343-bf597124dae1 because its active turn already ended"
+                    );
+                }
+            }
+            let bytes = serde_json::to_vec(&response).unwrap();
+            stream.write_u32_le(bytes.len() as u32).await.unwrap();
+            stream.write_all(&bytes).await.unwrap();
+            if mode == "desktop-no-owner" && ordinal == 1 {
+                return;
+            }
+            if ordinal == 0 {
+                source = "sender".into();
+            } else {
+                assert_eq!(request["sourceClientId"], source);
+            }
+        }
+    })
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn explicit_queue_mode_bypasses_desktop_and_never_resumes() {
+    let f = Fixture::new("desktop-queued");
+    f.bind();
+    f.complete();
+    let result = codex_bridge::dispatch_once(&f.engine)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result["state"], "delivered");
+    let calls = std::fs::read_to_string(f.temp.path().join("calls")).unwrap();
+    assert_eq!(calls.lines().count(), 1);
+    assert!(!calls.contains("--resume"));
+    assert_eq!(
+        codex_bridge::status(&f.engine, "selected-run").unwrap()["delivery_policy"]["effective_mode"],
+        "queued"
+    );
+    assert!(
+        codex_bridge::dispatch_once(&f.engine)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn explicit_immediate_mode_steers_or_requests_idle_resume_without_replaying_uncertain() {
+    for mode in [
+        "desktop-active",
+        "desktop-idle",
+        "desktop-no-owner",
+        "desktop-lost",
+        "desktop-wrong-idle",
+    ] {
+        let f = Fixture::new("desktop-immediate");
+        f.bind();
+        let mock = desktop_mock(&f, mode).await;
+        f.complete();
+        let result = codex_bridge::dispatch_once(&f.engine)
+            .await
+            .unwrap()
+            .unwrap();
+        mock.await.unwrap();
+        let uncertain = ["desktop-lost", "desktop-wrong-idle"].contains(&mode);
+        assert_eq!(
+            result["state"],
+            if uncertain { "uncertain" } else { "delivered" },
+            "{mode}"
+        );
+        let calls = std::fs::read_to_string(f.temp.path().join("calls")).unwrap_or_default();
+        let idle = ["desktop-idle", "desktop-no-owner"].contains(&mode);
+        assert_eq!(!calls.is_empty(), idle, "{mode}");
+        assert_eq!(calls.contains("--resume"), idle, "{mode}");
+        assert!(
+            codex_bridge::dispatch_once(&f.engine)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn immediate_mode_requires_desktop_transport_and_rejects_unknown_modes() {
+    let f = Fixture::new("");
+    let mut config = f.engine.current_config();
+    config.codex_delivery_mode = Some(codex_bridge::DeliveryMode::Immediate);
+    assert!(config.validate_memory().is_err());
+    config.codex_delivery_mode = Some(codex_bridge::DeliveryMode::Queued);
+    config.validate_memory().unwrap();
+    let mut value = serde_json::to_value(config).unwrap();
+    value["codex_delivery_mode"] = serde_json::json!("invalid");
+    assert!(serde_json::from_value::<Config>(value).is_err());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn desktop_steers_exact_owner_once_preserves_idle_and_never_replays_unknown_delivery() {
+    for mode in [
+        "desktop-active",
+        "desktop-idle",
+        "desktop-no-owner",
+        "desktop-lost",
+        "desktop-wrong-owner",
+        "desktop-wrong-idle",
+        "desktop-rejected",
+    ] {
+        let f = Fixture::new(mode);
+        let binding = f.bind();
+        let mock = desktop_mock(&f, mode).await;
+        f.complete();
+        let result = codex_bridge::dispatch_once(&f.engine)
+            .await
+            .unwrap()
+            .unwrap();
+        mock.await.unwrap();
+        let uncertain = [
+            "desktop-lost",
+            "desktop-wrong-owner",
+            "desktop-wrong-idle",
+            "desktop-rejected",
+        ]
+        .contains(&mode);
+        assert_eq!(
+            result["state"],
+            if uncertain { "uncertain" } else { "delivered" },
+            "{mode}"
+        );
+        let queued = std::fs::read_to_string(f.temp.path().join("calls")).unwrap_or_default();
+        assert_eq!(
+            !queued.is_empty(),
+            ["desktop-idle", "desktop-no-owner"].contains(&mode),
+            "{mode}"
+        );
+        assert!(!queued.contains("--resume"));
+        if mode != "desktop-no-owner" {
+            let call = std::fs::read_to_string(f.temp.path().join("native-call")).unwrap();
+            assert!(call.contains(binding["binding_id"].as_str().unwrap()));
+        }
+        assert!(
+            codex_bridge::dispatch_once(&f.engine)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            f.engine
+                .db
+                .retry_codex(&BindingId {
+                    binding_id: binding["binding_id"].as_str().unwrap().into()
+                })
+                .is_err()
+        );
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn desktop_rejects_public_socket_without_sending_or_queueing() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new("desktop-insecure");
+    let path = f.temp.path().join("ipc.sock");
+    let _listener = tokio::net::UnixListener::bind(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666)).unwrap();
+    f.bind();
+    f.complete();
+    let result = codex_bridge::dispatch_once(&f.engine)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result["state"], "uncertain");
+    assert!(!f.temp.path().join("calls").exists());
+    assert!(!f.temp.path().join("native-call").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn desktop_socket_setting_is_persisted_and_hot_reloaded_by_admin_api() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new("");
+    let token = "local-settings-test-token-at-least-32-characters";
+    let credential = f.temp.path().join("credential");
+    std::fs::write(&credential, token).unwrap();
+    std::fs::set_permissions(&credential, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let mut config = f.engine.current_config();
+    config.data_dir = f.temp.path().join("settings-data");
+    config.admin_token_file = Some(credential);
+    let path = f.temp.path().join("settings.toml");
+    std::fs::write(&path, toml::to_string(&config).unwrap()).unwrap();
+    let engine = Engine::open(Config::load(&path).unwrap()).unwrap();
+    engine.config_file.set(path.clone()).unwrap();
+    let read = preflight::settings::request(
+        &engine,
+        preflight::settings::Request {
+            admin_token: token.into(),
+            expected_revision: None,
+            configuration: None,
+        },
+    )
+    .unwrap();
+    let mut update = read["saved"].clone();
+    let socket = f.temp.path().join("ipc.sock");
+    update["codex_ipc_socket"] = serde_json::json!(socket);
+    update["codex_delivery_mode"] = serde_json::json!("immediate");
+    let saved = preflight::settings::request(
+        &engine,
+        preflight::settings::Request {
+            admin_token: token.into(),
+            expected_revision: Some(read["revision"].as_str().unwrap().into()),
+            configuration: Some(update),
+        },
+    )
+    .unwrap();
+    assert_eq!(saved["restart_required"], false);
+    assert_eq!(saved["reload_required"], false);
+    assert_eq!(
+        engine.current_config().codex_ipc_socket,
+        Some(socket.clone())
+    );
+    assert_eq!(Config::load(&path).unwrap().codex_ipc_socket, Some(socket));
+    assert_eq!(
+        engine.current_config().codex_delivery_mode,
+        Some(codex_bridge::DeliveryMode::Immediate)
+    );
+    let mut queued = saved["saved"].clone();
+    queued["codex_delivery_mode"] = serde_json::json!("queued");
+    let queued = preflight::settings::request(
+        &engine,
+        preflight::settings::Request {
+            admin_token: token.into(),
+            expected_revision: Some(saved["revision"].as_str().unwrap().into()),
+            configuration: Some(queued),
+        },
+    )
+    .unwrap();
+    assert_eq!(queued["reload_required"], false);
+    assert_eq!(
+        Config::load(&path).unwrap().codex_delivery_mode,
+        Some(codex_bridge::DeliveryMode::Queued)
+    );
+    assert_eq!(
+        preflight::control::capabilities(&engine)["features"]["codex_delivery_policy"]["effective_mode"],
+        "queued"
+    );
 }
 #[tokio::test]
 async fn failed_spawn_is_retryable_but_unknown_acceptance_is_not() {
