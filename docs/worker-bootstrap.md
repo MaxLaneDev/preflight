@@ -10,6 +10,29 @@ ssh_command = "/usr/bin/ssh"
 Adding the listener requires a restart after active work finishes. Configure SSH
 keys and trusted `known_hosts`; Preflight rejects unknown host keys and does not forward your agent.
 
+## Worker prerequisites
+
+Use a matching Preflight binary and an SSH account with a writable installation
+directory. On a minimal Ubuntu worker image, install runtime prerequisites in the
+image, before connecting:
+
+```sh
+apt-get update
+apt-get install -y --no-install-recommends openssh-server ca-certificates
+```
+
+The worker uses the system certificate store. An image without CA certificates
+can fail to create its HTTP client even when the SSH tunnel uses loopback HTTP.
+Build tools are separate: add your compiler to the image or use a
+[workspace-scoped setup stage](environment-setup.md).
+
+On an ARM64 Docker host, `--platform linux/amd64` runs the Linux x86_64 binary
+under emulation. Use that binary to create the worker package, then connect to
+the container's SSH endpoint with `worker_ssh_start`. Publish SSH only on
+`127.0.0.1`, trust its host key, and keep the worker gateway inside the tunnel.
+This tests the x86_64 executable and SSH transport; it does not measure native
+x86_64 performance or a separate machine's network.
+
 ## Prepare a package
 
 On the matching worker OS/architecture, using its built Preflight binary:
