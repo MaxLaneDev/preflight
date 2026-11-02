@@ -8,10 +8,57 @@ const MAX_BYTES: usize = 128 * 1024 * 1024;
 const MAX_ENTRIES: usize = 20_000;
 const EXCLUDED: [&str; 4] = [".git", ".preflight", "target", "node_modules"];
 
+// Git accepts ordinary Windows paths; filesystem containment still uses canonical paths.
+fn argument_path(path: &Path) -> std::borrow::Cow<'_, Path> {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        let mut parts = path.components();
+        let mut normal = match parts.next() {
+            Some(Component::Prefix(prefix)) => match prefix.kind() {
+                Prefix::VerbatimDisk(drive) => {
+                    std::path::PathBuf::from(format!("{}:", drive as char))
+                }
+                Prefix::VerbatimUNC(server, share) => {
+                    if [server, share].iter().any(|name| {
+                        name.to_str()
+                            .is_none_or(|s| !crate::trees::portable_component(s))
+                    }) {
+                        return std::borrow::Cow::Borrowed(path);
+                    }
+                    let mut value = std::ffi::OsString::from(r"\\");
+                    value.push(server);
+                    value.push(r"\");
+                    value.push(share);
+                    std::path::PathBuf::from(value)
+                }
+                _ => return std::borrow::Cow::Borrowed(path),
+            },
+            _ => return std::borrow::Cow::Borrowed(path),
+        };
+        // Stripping the namespace must not normalize an NT-only name into another file.
+        if parts.clone().any(|part| match part {
+            Component::RootDir => false,
+            Component::Normal(name) => name
+                .to_str()
+                .is_none_or(|s| !crate::trees::portable_component(s)),
+            _ => true,
+        }) {
+            return std::borrow::Cow::Borrowed(path);
+        }
+        normal.push(parts.as_path());
+        std::borrow::Cow::Owned(normal)
+    }
+    #[cfg(not(windows))]
+    std::borrow::Cow::Borrowed(path)
+}
+
 pub(crate) async fn git(cwd: &Path, args: &[&str], input: &[u8], limit: usize) -> Result<Vec<u8>> {
     let mut command = tokio::process::Command::new("git");
+    #[cfg(windows)]
+    command.args(["-c", "core.longpaths=true"]);
     command
-        .current_dir(cwd)
+        .current_dir(argument_path(cwd))
         .env_clear()
         .kill_on_drop(true)
         .args([
@@ -20,7 +67,10 @@ pub(crate) async fn git(cwd: &Path, args: &[&str], input: &[u8], limit: usize) -
             "-c",
             "core.hooksPath=/dev/null",
         ])
-        .args(args)
+        .args(
+            args.iter()
+                .map(|arg| argument_path(Path::new(arg)).into_owned()),
+        )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -42,7 +92,7 @@ pub(crate) async fn git(cwd: &Path, args: &[&str], input: &[u8], limit: usize) -
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env(
             "GIT_CEILING_DIRECTORIES",
-            cwd.parent().context("Git cwd parent")?,
+            argument_path(cwd.parent().context("Git cwd parent")?).into_owned(),
         );
     let mut child = command.spawn().context("start local Git")?;
     let mut stdin = child.stdin.take().context("Git stdin")?;
@@ -368,5 +418,49 @@ pub async fn prepare(
     tokio::select! {
         _=cancel.cancelled()=>Err(invalid("source preparation cancelled")),
         result=tokio::time::timeout(Duration::from_secs(60),work)=>result.context("Git preparation exceeded 60 seconds")?,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn external_arguments_preserve_literals_and_only_remove_windows_verbatim_prefixes() {
+        for value in [
+            "HEAD:src/main.rs",
+            "--git-dir",
+            "folder with spaces",
+            "/source/tree",
+        ] {
+            assert_eq!(argument_path(Path::new(value)).as_ref(), Path::new(value));
+        }
+        #[cfg(windows)]
+        for (value, expected) in [
+            (
+                r"\\?\C:\source folder\patch-git",
+                r"C:\source folder\patch-git",
+            ),
+            (
+                r"\\?\UNC\server\share\source folder",
+                r"\\server\share\source folder",
+            ),
+        ] {
+            let converted = argument_path(Path::new(value));
+            assert_eq!(converted.as_ref(), Path::new(expected));
+            assert!(!converted.to_str().unwrap().starts_with(r"\\?\"));
+        }
+        #[cfg(not(windows))]
+        assert_eq!(
+            argument_path(Path::new(r"\\?\C:\literal")).as_ref(),
+            Path::new(r"\\?\C:\literal")
+        );
+        #[cfg(windows)]
+        for value in [
+            r"\\?\C:\project.\file",
+            r"\\?\C:\CON\file",
+            r"\\?\C:\root\..\other",
+        ] {
+            assert_eq!(argument_path(Path::new(value)).as_ref(), Path::new(value));
+        }
     }
 }

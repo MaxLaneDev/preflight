@@ -341,6 +341,7 @@ fn plugin(root: &Path, destination: &Path, zipped: bool) -> Result<Value> {
             zip.start_file(
                 &name,
                 zip::write::SimpleFileOptions::default()
+                    .system(zip::System::Unix)
                     .compression_method(zip::CompressionMethod::Deflated)
                     .unix_permissions(if name.ends_with(".sh") { 0o755 } else { 0o644 }),
             )?;

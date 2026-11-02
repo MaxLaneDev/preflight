@@ -52,7 +52,9 @@ async fn queued(f: &Fixture, run: &str) {
             let state = f.engine.db.run(run).unwrap();
             assert!(
                 !state.status.terminal(),
-                "run ended before dispatch: {state:?}"
+                "run ended before dispatch: {state:?}; report={:?}; stderr={}",
+                preflight::api::compact_report(&f.engine, run),
+                output(&f.engine, run, "stderr")
             );
             tokio::time::sleep(Duration::from_millis(20)).await;
         }

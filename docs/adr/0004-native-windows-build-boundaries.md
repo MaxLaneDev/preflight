@@ -17,6 +17,11 @@ executable paths remain native paths, including in command arguments.
 Runtime-policy writes use the worker's existing `StateLock`, which explicitly
 unlocks on drop. Closing a file alone can leave a fork-inherited lock alive.
 
+Git receives ordinary Windows drive/UNC paths with long-path support enabled;
+internal filesystem checks retain canonical paths. ZIP entries explicitly use
+Unix permission metadata on every producer OS. Tracked text uses LF so bundle
+and lockfile checksums do not depend on the checkout host.
+
 `setup` retains its POSIX contract. Windows controllers can dispatch it to Linux
 workers or containers; native Windows targets reject it. Shared artifact, test
 and cancellation checks still run on Windows with native executable fixtures.
