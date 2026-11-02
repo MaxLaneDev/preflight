@@ -1,14 +1,12 @@
 # Installation
 
 [Release packages](https://github.com/MaxLaneDev/preflight/releases/latest) support
-macOS ARM64 and Linux ARM64. Install with curl:
+macOS and Linux on ARM64 or x86_64, and Windows x86_64. Install on macOS or Linux with curl:
 
 ```sh
 curl -fsSL https://github.com/MaxLaneDev/preflight/releases/latest/download/install.sh | sh
 ```
 
-The 0.1.3 candidate also targets macOS x86_64, Linux x86_64 and Windows x86_64. These become
-available through `latest` only after native CI checks and release publication.
 On Windows, download and run the release installer in 64-bit PowerShell:
 
 ```powershell

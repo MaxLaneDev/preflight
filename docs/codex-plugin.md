@@ -47,7 +47,7 @@ and `mcp.json`. Its launch command uses the bundled binary, not a binary found o
 hooks are required. The server's database and credentials stay outside the ZIP.
 Choose this package or the HTTP plugin above; do not enable both connections.
 
-Each archive targets one platform. The 0.1.3 candidate supports macOS ARM64/x86_64,
+Each archive targets one platform. The 0.1.3 release supports macOS ARM64/x86_64,
 Linux ARM64/x86_64 and Windows x86_64. Use a matching archive; Windows uses
 `./bin/preflight.exe`. The input checksum and package contents
 are verified before writing the ZIP. Existing destinations are never replaced.
