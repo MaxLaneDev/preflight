@@ -22,6 +22,10 @@ internal filesystem checks retain canonical paths. ZIP entries explicitly use
 Unix permission metadata on every producer OS. Tracked text uses LF so bundle
 and lockfile checksums do not depend on the checkout host.
 
+Windows worker output bundles preserve explicitly declared executable types in
+the SHA-covered manifest; Windows has no Unix execute bit to recover from a file.
+The server still validates declared paths, types and transferred content.
+
 `setup` retains its POSIX contract. Windows controllers can dispatch it to Linux
 workers or containers; native Windows targets reject it. Shared artifact, test
 and cancellation checks still run on Windows with native executable fixtures.

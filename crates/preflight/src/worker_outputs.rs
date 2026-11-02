@@ -211,6 +211,19 @@ pub fn pack(
     let snapshot = tempfile::tempdir_in(parent)?;
     let tree = snapshot.path().join("tree");
     let manifest = crate::trees::copy(staging.path(), &tree)?;
+    #[cfg(windows)]
+    let manifest = {
+        let mut manifest = manifest;
+        // Windows has no execute bit; preserve the declared artifact type on the wire.
+        for (path, kind) in paths {
+            if *kind == ArtifactKind::Executable
+                && let Some(entry) = manifest.entries.get_mut(path)
+            {
+                entry.executable = true;
+            }
+        }
+        manifest
+    };
     let digest = manifest.sha256()?;
     let mut bundle = tempfile::NamedTempFile::new_in(parent)?;
     worker_transfer::encode(&tree, &manifest, bundle.as_file_mut())?;
@@ -229,13 +242,26 @@ mod tests {
         std::fs::write(source.join("out/module/data"), b"\0binary\xff").unwrap();
         std::fs::write(source.join("out/report.xml"), "<testsuite/>").unwrap();
         std::fs::write(source.join("private.txt"), "never return").unwrap();
+        std::fs::write(source.join("out/tool.exe"), b"test executable").unwrap();
+        std::fs::write(source.join("out/data.exe"), b"ordinary file").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                source.join("out/tool.exe"),
+                std::fs::Permissions::from_mode(0o700),
+            )
+            .unwrap();
+        }
         let paths = BTreeMap::from([
             ("out/module".into(), ArtifactKind::Directory),
             ("out/report.xml".into(), ArtifactKind::File),
+            ("out/tool.exe".into(), ArtifactKind::Executable),
+            ("out/data.exe".into(), ArtifactKind::File),
             ("missing.txt".into(), ArtifactKind::File),
         ]);
         let (bundle, digest) = pack(&source, &paths, root.path()).unwrap();
-        let tree = worker_transfer::decode(
+        let mut tree = worker_transfer::decode(
             &mut std::fs::File::open(bundle.path()).unwrap(),
             &digest,
             root.path(),
@@ -247,6 +273,26 @@ mod tests {
         );
         assert!(tree.directory.path().join("out/module/empty").is_dir());
         assert!(!tree.directory.path().join("private.txt").exists());
+        assert!(tree.manifest.entries["out/tool.exe"].executable);
+        assert!(!tree.manifest.entries["out/data.exe"].executable);
+        let spec = worker_jobs::Spec {
+            container: None,
+            command: crate::model::CommandSpec {
+                program: "tool.exe".into(),
+                args: vec![],
+                timeout_seconds: 5,
+            },
+            cwd: ".".into(),
+            env: BTreeMap::new(),
+            returns: paths,
+        };
+        validate_manifest(&spec, &tree.manifest).unwrap();
+        tree.manifest
+            .entries
+            .get_mut("out/tool.exe")
+            .unwrap()
+            .executable = false;
+        assert!(validate_manifest(&spec, &tree.manifest).is_err());
         assert!(!tree.directory.path().join("missing.txt").exists());
         for path in [
             "../secret",
