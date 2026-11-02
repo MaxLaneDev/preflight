@@ -96,7 +96,10 @@ jobs:
       - name: Install and start native Windows package
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.package.outcome == 'success' }}
         shell: pwsh
-        run: ./scripts/test-windows-package.ps1 -Packages dist
+        run: |
+          ./scripts/test-windows-package.ps1 -Packages dist
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./scripts/test-windows-package.ps1 -Packages dist
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 package acceptance failed.' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !inputs.macos27_only }}
         with:

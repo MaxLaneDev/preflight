@@ -38,17 +38,23 @@ try {
     }
     if (!$ready) { throw 'Installed server readiness timed out.' }
     foreach ($path in @('/', '/app.js', '/app.css', '/executions')) {
-        $response = Invoke-WebRequest "$base$path" -TimeoutSec 10
+        $response = Invoke-WebRequest "$base$path" -UseBasicParsing -TimeoutSec 10
         if ($response.StatusCode -ne 200) { throw "Bundled UI missing: $path" }
     }
     $capabilities = Invoke-RestMethod "$base/api/v1/capabilities" -TimeoutSec 10
     if (!$capabilities.features.bundled_web_ui) { throw 'Bundled UI capability missing.' }
     $headers = @{Accept='application/json, text/event-stream'}
     $body = @{jsonrpc='2.0';id=1;method='initialize';params=@{protocolVersion='2025-03-26';capabilities=@{};clientInfo=@{name='windows-package-check';version='1'}}} | ConvertTo-Json -Depth 8 -Compress
-    $mcp = Invoke-WebRequest "$base/mcp" -Method Post -Headers $headers -ContentType application/json -Body $body -TimeoutSec 10
+    $mcp = Invoke-WebRequest "$base/mcp" -UseBasicParsing -Method Post -Headers $headers -ContentType application/json -Body $body -TimeoutSec 10
     if ($mcp.StatusCode -ne 200 -or $mcp.Content -notmatch 'protocolVersion') { throw 'Installed MCP initialization failed.' }
-    & $build package uninstall --prefix $prefix 2> "$temporary\busy.err" | Out-Null
-    if ($LASTEXITCODE -eq 0 -or !(Test-Path -LiteralPath $prefix)) { throw 'Uninstall did not protect the running server.' }
+    $savedPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell treats expected native stderr as an error record.
+        $ErrorActionPreference = 'Continue'
+        & $build package uninstall --prefix $prefix 2> "$temporary\busy.err" | Out-Null
+        $busyExit = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $savedPreference }
+    if ($busyExit -eq 0 -or !(Test-Path -LiteralPath $prefix)) { throw 'Uninstall did not protect the running server.' }
     Stop-Process -Id $server.Id; $server.WaitForExit(); $server = $null
     & $build package uninstall --prefix $prefix | Out-Null
     if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $prefix)) { throw 'Uninstall failed.' }

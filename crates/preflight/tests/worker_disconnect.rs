@@ -21,21 +21,34 @@ fn worker(base: &str, root: &Path, mode: &str) -> tokio::process::Command {
     command
 }
 
-fn command_produced_output(path: &Path, id: &str) -> bool {
+fn observed_database(path: &Path) -> rusqlite::Result<rusqlite::Connection> {
     // Observation must not migrate or lock the database that the worker is opening.
-    (|| -> rusqlite::Result<bool> {
-        let db = rusqlite::Connection::open_with_flags(
-            path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?;
-        db.busy_timeout(Duration::ZERO)?;
-        db.query_row(
-            "SELECT EXISTS(SELECT 1 FROM log_events WHERE run_id=?1 AND stream='stdout')",
-            [id],
-            |row| row.get(0),
-        )
-    })()
-    .unwrap_or(false)
+    let db =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    db.busy_timeout(Duration::ZERO)?;
+    Ok(db)
+}
+
+fn command_produced_output(path: &Path, id: &str) -> bool {
+    observed_database(path)
+        .and_then(|db| {
+            db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM log_events WHERE run_id=?1 AND stream='stdout')",
+                [id],
+                |row| row.get(0),
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn command_status(path: &Path, id: &str) -> Option<String> {
+    observed_database(path)
+        .and_then(|db| {
+            db.query_row("SELECT status FROM runs WHERE id=?1", [id], |row| {
+                row.get(0)
+            })
+        })
+        .ok()
 }
 
 #[test]
@@ -43,17 +56,28 @@ fn readiness_observation_does_not_create_migrate_or_wait_for_a_writer() {
     let temp = tempfile::tempdir().unwrap();
     let path = temp.path().join("worker.sqlite3");
     assert!(!command_produced_output(&path, "run"));
+    assert_eq!(command_status(&path, "run"), None);
     assert!(!path.exists());
     let db = rusqlite::Connection::open(&path).unwrap();
     db.execute_batch("CREATE TABLE log_events(run_id TEXT,stream TEXT); INSERT INTO log_events VALUES ('run','lifecycle'),('other','stdout');").unwrap();
+    db.execute_batch(
+        "CREATE TABLE runs(id TEXT,status TEXT); INSERT INTO runs VALUES ('run','running');",
+    )
+    .unwrap();
+    assert_eq!(command_status(&path, "run").as_deref(), Some("running"));
+    assert_eq!(command_status(&path, "other"), None);
     assert!(!command_produced_output(&path, "run"));
     db.execute("INSERT INTO log_events VALUES ('run','stdout')", [])
         .unwrap();
     assert!(command_produced_output(&path, "run"));
     db.execute_batch("BEGIN EXCLUSIVE").unwrap();
     assert!(!command_produced_output(&path, "run"));
+    assert_eq!(command_status(&path, "run"), None);
     db.execute_batch("ROLLBACK").unwrap();
     assert!(command_produced_output(&path, "run"));
+    db.execute("UPDATE runs SET status='cancelled' WHERE id='run'", [])
+        .unwrap();
+    assert_eq!(command_status(&path, "run").as_deref(), Some("cancelled"));
     assert_eq!(
         db.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table'",
@@ -61,7 +85,7 @@ fn readiness_observation_does_not_create_migrate_or_wait_for_a_writer() {
             |row| row.get::<_, u32>(0)
         )
         .unwrap(),
-        1
+        2
     );
 }
 
@@ -185,9 +209,22 @@ async fn disconnected_worker_stops_command_and_never_reexecutes_lost_claim() {
         .await
         .unwrap()
         .unwrap();
+    // Native termination and the CLI's final HTTP report are separate phases.
+    let mut native_status = None;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            native_status = command_status(&db_path, id);
+            if native_status.as_deref() == Some(RunState::Cancelled.as_str()) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("connection loss must stop native execution within 10 seconds; last status: {native_status:?}"));
     let result = tokio::time::timeout(Duration::from_secs(10), child.wait_with_output())
         .await
-        .expect("connection loss must stop native execution well before its 60 second timeout")
+        .expect("worker journal/report shutdown must finish after native execution stopped")
         .unwrap();
     assert!(!result.status.success());
     let saved = journal(&state);

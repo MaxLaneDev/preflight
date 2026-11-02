@@ -50,7 +50,8 @@ jobs:
             gh release download $version --repo MaxLaneDev/preflight --pattern install.ps1 --pattern '*-windows-x86_64.tar.gz*' --dir $temporary
             if ($LASTEXITCODE -ne 0) { throw 'Release assets unavailable.' }
             $prefix = Join-Path $temporary 'installation'
-            $receipt = (& "$temporary/install.ps1" -Version $env:PREFLIGHT_VERSION -Prefix $prefix -Config "$temporary/settings/preflight.toml" -Data "$temporary/data") | ConvertFrom-Json
+            $receipt = (& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$temporary/install.ps1" -Version $env:PREFLIGHT_VERSION -Prefix $prefix -Config "$temporary/settings/preflight.toml" -Data "$temporary/data") | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw 'Published Windows PowerShell installer failed.' }
             $installedVersion = (& $receipt.binary --version) | ConvertFrom-Json
             if ($LASTEXITCODE -ne 0 -or $installedVersion.version -cne $version.Substring(1)) { throw 'Wrong installed version.' }
             Copy-Item -LiteralPath $receipt.binary -Destination "$temporary/verifier.exe"
