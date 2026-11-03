@@ -184,12 +184,18 @@ async fn desktop_mock(f: &Fixture, mode: &'static str) -> tokio::task::JoinHandl
                     assert_eq!(request["targetClientId"], "owner");
                     let p = &request["params"];
                     assert_eq!(p["input"][0]["text_elements"], serde_json::json!([]));
-                    assert!(
-                        p["input"][0]["text"]
-                            .as_str()
-                            .unwrap()
-                            .contains("without pausing or replacing")
+                    assert_eq!(
+                        p["input"][0]["text"],
+                        "Preflight: run selected-run completed — succeeded."
                     );
+                    let policy = &p["additionalContext"]["preflight_delivery_policy"];
+                    assert_eq!(policy["kind"], "application");
+                    assert!(policy.get("name").is_none());
+                    let guidance = policy["value"].as_str().unwrap();
+                    assert!(guidance.contains("without pausing or replacing"));
+                    assert!(guidance.contains("Do not resume user-paused work"));
+                    assert!(guidance.contains("repeat a delivery_id"));
+                    assert!(!guidance.contains("selected-run"));
                     assert_eq!(
                         p["additionalContext"]["preflight_completion"]["name"],
                         "preflight_completion"
@@ -239,6 +245,16 @@ async fn desktop_mock(f: &Fixture, mode: &'static str) -> tokio::task::JoinHandl
                         "Cannot steer conversation 01a17f49-a837-7553-a343-bf597124dae1 because its active turn already ended"
                     );
                 }
+            }
+            if mode == "desktop-ownerless-error" && ordinal == 2 {
+                response
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("handledByClientId");
+                response["resultType"] = serde_json::json!("error");
+                response["error"] = serde_json::json!(
+                    "additional context name is only supported for untrusted context"
+                );
             }
             let bytes = serde_json::to_vec(&response).unwrap();
             stream.write_u32_le(bytes.len() as u32).await.unwrap();
@@ -290,6 +306,7 @@ async fn explicit_immediate_mode_steers_or_requests_idle_resume_without_replayin
         "desktop-no-owner",
         "desktop-lost",
         "desktop-wrong-idle",
+        "desktop-ownerless-error",
     ] {
         let f = Fixture::new("desktop-immediate");
         f.bind();
@@ -300,7 +317,12 @@ async fn explicit_immediate_mode_steers_or_requests_idle_resume_without_replayin
             .unwrap()
             .unwrap();
         mock.await.unwrap();
-        let uncertain = ["desktop-lost", "desktop-wrong-idle"].contains(&mode);
+        let uncertain = [
+            "desktop-lost",
+            "desktop-wrong-idle",
+            "desktop-ownerless-error",
+        ]
+        .contains(&mode);
         assert_eq!(
             result["state"],
             if uncertain { "uncertain" } else { "delivered" },

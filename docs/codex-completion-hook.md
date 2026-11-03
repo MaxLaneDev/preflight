@@ -79,3 +79,8 @@ Lifecycle hooks in the [manual plugin](codex-plugin.md) validate completion
 messages. They do not wake idle chats or authorize builds. Ambiguous delivery
 requires manual reconciliation and cannot be retried automatically; disabling a
 binding stops future attempts.
+
+Visible completion messages include the exact run ID and terminal status:
+`Preflight: run <UUID> completed — succeeded.` The additional context retains
+project/run/delivery IDs and the corrective delivery policy. Read the actual run
+through MCP before using a completion; a notification is not the result itself.

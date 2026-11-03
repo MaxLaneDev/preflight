@@ -37,6 +37,7 @@ pub struct Delivery {
     pub id: String,
     pub thread_id: String,
     pub message: String,
+    pub summary: String,
 }
 pub fn bind(engine: &Engine, request: &Bind) -> Result<Value> {
     ensure!(
@@ -123,12 +124,14 @@ impl Db {
         };
         tx.execute("UPDATE codex_bindings SET state='sending',attempts=attempts+1,updated_at=CURRENT_TIMESTAMP WHERE id=?1",[&id])?;
         tx.commit()?;
+        let summary = format!("Preflight: run {run} completed — {status}.");
         let payload = json!({"delivery_id":id,"run_id":run,"project_id":project,"status":status,"event_cursor":cursor});
         Ok(Some(Delivery {
             id,
             thread_id: thread,
+            summary: summary.clone(),
             message: format!(
-                "Preflight completion hook: {payload}\nRead this run's results through Preflight MCP and continue the user's existing task if still applicable. This message reports a completion, not a new task scope. Do not resume user-paused work. Do not repeat work for the same delivery_id."
+                "{summary}\nPreflight completion hook: {payload}\nRead this run's results through Preflight MCP and continue the user's existing task if still applicable. This message reports a completion, not a new task scope. Do not resume user-paused work. Do not repeat work for the same delivery_id."
             ),
         }))
     }

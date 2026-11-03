@@ -54,3 +54,14 @@ test('hour durations and compact stage clocks advance locally',async()=>{
   elapsedNode(stage,1000,4000,true);assert.equal(stage.textContent,'3.0 s');assert.equal(stage.dataset.elapsedEnd,'4000');
  }finally{delete globalThis.document;delete globalThis.addEventListener;}
 });
+
+test('completion notifications drain event pages without skipping events or duplicating selected-run notices',async()=>{
+ const source=new EventTarget(),notices=[];let snapshot=0;
+ const context={state:{project:'p',run:null,section:'pipelines'},document:{hidden:false,querySelector:()=>null},liveKey:null,liveSource:null,liveConnected:false,lastLiveCompletion:null,sharedLiveSource:()=>source,
+  api:async url=>{if(url.startsWith('live/snapshot'))return {completion_cursor:snapshot++?105:0,log_cursor:0,run:null};const after=Number(new URLSearchParams(url.split('?')[1]).get('after')),end=Math.min(after+100,105);return {events:Array.from({length:end-after},(_,i)=>({run_id:'run-'+(after+i+1),status:'succeeded'})),next_cursor:end,has_more:end<105};},
+  pollCurrentPage:async()=>{},query:value=>new URLSearchParams(value).toString(),uiAttribute(){},$:()=>({}),notice:text=>notices.push(text),uiError:x=>x,MessageEvent};
+ runInNewContext('('+extract('function syncLive()',"try{const connection=")+')',context)();
+ source.dispatchEvent(new MessageEvent('change',{data:'{"hint":true}'}));await new Promise(setImmediate);
+ source.dispatchEvent(new MessageEvent('change',{data:'{"hint":true}'}));await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(notices.length,105);assert.equal(new Set(notices).size,105);assert.equal(notices.at(-1),'Preflight: run run-105 completed — succeeded.');
+});

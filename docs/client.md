@@ -27,3 +27,9 @@ preflight-client --server http://127.0.0.1:4170 --bind 127.0.0.1:4172
 ```
 
 This is a compatibility tool; normal installation needs only the server.
+
+The bell in the bottom bar opens recent notifications; **View all** opens the journal.
+Toasts disappear after 5 seconds (errors: 10), but stay in history until its 200-entry
+limit is reached. Hover/focus pauses expiry. History and unread state are local to this
+browser and server origin; they survive reload and synchronize across tabs. Copy
+confirmations stay transient. Closing a toast does not mark its history entry read.

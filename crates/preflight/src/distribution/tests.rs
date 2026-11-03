@@ -385,3 +385,17 @@ async fn rollback_refuses_modified_previous_binary_and_replay_keeps_previous() {
         second
     );
 }
+
+#[test]
+fn hooks_accept_exact_completion_summary_and_reject_mismatches() {
+    let id = "01a17f49-a837-7553-a343-bf597124dae1";
+    let payload = json!({"delivery_id":id,"project_id":id,"run_id":id,"event_cursor":57,"status":"succeeded"});
+    let prompt =
+        format!("Preflight: run {id} completed — succeeded.\nPreflight completion hook: {payload}");
+    let mut event = json!({"hook_event_name":"UserPromptSubmit","prompt":prompt});
+    assert!(hook_context(&event).unwrap().contains(id));
+    event["prompt"] = json!(format!(
+        "Preflight: run {id} completed — failed.\nPreflight completion hook: {payload}"
+    ));
+    assert!(hook_context(&event).is_none());
+}

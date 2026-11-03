@@ -1,3 +1,4 @@
+import {installNotificationCenter} from '/notification-center.mjs';
 import {installReleaseNotice} from '/releases.mjs';
 import {renderEnvironment} from '/environment-editor.mjs';
 import {configureLive,elapsedNode,tickElapsed,durationText,liveSource as sharedLiveSource} from '/live-client.mjs';
@@ -49,16 +50,18 @@ function placeNotifications(){
 }
 window.addEventListener('resize',placeNotifications);
 new MutationObserver(placeNotifications).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
+let notificationCenter;
 const notice = value => {
  if(!value){notifications.querySelectorAll('.toast:not(.error)').forEach(n=>n.remove());placeNotifications();return;}
  const error=value instanceof Error,message=value?.localizedMessage||(error?value.message:value),messageText=String(message);
+ notificationCenter.add(messageText,error);
  for(const existing of notifications.children)if(existing.dataset.message===messageText){existing.remove();break;}
  const toast=el('div',undefined,'toast'+(error?' error':''));toast.dataset.message=messageText;
  const icon=el('span',(error?'!':'✓'),'toast-icon');icon.setAttribute('aria-hidden','true');
  const text=el('span',message,'toast-message');text.setAttribute('role',error?'alert':'status');
  const dismiss=button('×',()=>{toast.remove();placeNotifications();});uiAttribute(dismiss,'aria-label',uiMessage("Dismiss notification"));uiAttribute(dismiss,"title",uiMessage("Dismiss notification"));
  toast.append(icon,text,dismiss);notifications.append(toast);placeNotifications();
- if(!error){const expire=()=>{if(!toast.isConnected)return;if(toast.matches(':hover')||toast.contains(document.activeElement)){setTimeout(expire,1000);return;}toast.remove();placeNotifications();};setTimeout(expire,5000);}
+ {const expire=()=>{if(!toast.isConnected)return;if(toast.matches(':hover')||toast.contains(document.activeElement)){setTimeout(expire,1000);return;}toast.remove();placeNotifications();};setTimeout(expire,error?10000:5000);}
 };
 const action = fn => async event => {
  if(event?.type==='submit')event.preventDefault();
@@ -68,6 +71,7 @@ const action = fn => async event => {
  try { await fn(event); } catch(e){notice(e);if(control?.closest?.('#editor'))notifications.lastElementChild?.setAttribute('data-context','editor');} finally {if(control?.tagName==='BUTTON'){control.removeAttribute('aria-busy');}}
 };
 const button = (text, fn) => {const b=el('button',text);b.type='button';b.onclick=action(isPageLabel(b.textContent)?registerPageButton(b,fn):fn);return b;};
+notificationCenter=installNotificationCenter({el,button,modalClose,closeDialog});
 const pretty = value => JSON.stringify(value,null,2);
 const query = values => new URLSearchParams(Object.entries(values).filter(([,v])=>v!==undefined&&v!==null)).toString();
 async function api(path, body, method) {const options=body===undefined?{...(method?{method}:{})}:{method:method||'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};let r=await fetch('/api/v1/'+path,options);if(r.status===401&&state.bundled){await authenticateBrowser(true);r=await fetch('/api/v1/'+path,options);}const text=await r.text();let value;try{value=JSON.parse(text);}catch{throw uiError(text.slice(0,200));}if(!r.ok){const error=uiError((value.error?.message || pretty(value)));error.status=r.status;throw error;}return value;}
@@ -395,7 +399,7 @@ function syncLive(){
  let updating=false,dirty=false,lastSnapshot='';const project=state.project,run=state.run,source=sharedLiveSource();liveSource=source;
  source.onopen=()=>{if(liveSource===source){liveConnected=true;uiText($('sync-status'),uiMessage("Live"));}};
  source.onerror=()=>{if(liveSource===source){liveConnected=false;uiText($('sync-status'),uiMessage("Reconnecting…"));}};
- source.addEventListener('change',async event=>{if(liveSource!==source)return;if(updating){dirty=true;return;}updating=true;try{const message=JSON.parse(event.data),data=message.hint?await api('live/snapshot?'+query({project_id:project,run_id:run})):message;if(liveSource!==source)return;const signature=JSON.stringify(data);if(!message.hint&&signature===lastSnapshot)return;lastSnapshot=signature;if(lastLiveCompletion!==null&&data.completion_cursor>lastLiveCompletion){const page=await api('completion-events?'+query({project_id:project,after:lastLiveCompletion,limit:3}));for(const item of page.events){const text=uiMessage('Run {0} · {1}',{0:item.run_id.slice(-8),1:uiStatus(item.status)});notice((['failed','timed_out','infrastructure_error'].includes(item.status)?uiError(text):text));}}lastLiveCompletion=data.completion_cursor;
+ source.addEventListener('change',async event=>{if(liveSource!==source)return;if(updating){dirty=true;return;}updating=true;try{const message=JSON.parse(event.data),data=message.hint?await api('live/snapshot?'+query({project_id:project,run_id:run})):message;if(liveSource!==source)return;const signature=JSON.stringify(data);if(!message.hint&&signature===lastSnapshot)return;lastSnapshot=signature;if(lastLiveCompletion!==null&&data.completion_cursor>lastLiveCompletion){const page=await api('completion-events?'+query({project_id:project,after:lastLiveCompletion,limit:100}));for(const item of page.events){const text='Preflight: run '+item.run_id+' completed — '+item.status+'.';notice((['failed','timed_out','infrastructure_error'].includes(item.status)?uiError(text):text));}lastLiveCompletion=page.next_cursor;dirty=page.has_more===true;}else if(lastLiveCompletion===null)lastLiveCompletion=data.completion_cursor;
  if(!document.querySelector('dialog[open]'))await pollCurrentPage({eventDriven:true});state.pollLogs?.();}catch(error){uiAttribute($('sync-status'),"title",error.message);}finally{updating=false;if(dirty&&liveSource===source){dirty=false;source.dispatchEvent(new MessageEvent('change',{data:'{"hint":true}'}));}}});
 }
 try{const connection=await (await fetch('/connection')).json();uiText($('server'),connection.server);state.bundled=connection.bundled===true;if(state.bundled)await authenticateBrowser();const caps=await api('capabilities');configureLive(caps.features.shared_sse_hints===true);if(caps.features.release_notifications)installReleaseNotice({anchor:$('settings-open'),api,el,button,modalClose,closeDialog,notice});state.hostArch=caps.execution?.architecture;state.canDocker=caps.features.docker_executor===true;state.apiRole=caps.access?.role||'local_owner';state.canCI=caps.features.external_ci_ingestion===true;ciNav.hidden=!state.canCI;state.canRetry=caps.features.stage_retry===true;state.canTestSearch=caps.features.test_result_filters===true;state.canDiagnostics=caps.features.diagnostic_reports===true;state.canRetention=caps.features.evidence_expiry===true&&caps.features.ranked_cache_eviction===true;state.canEvidenceFilters=caps.features.evidence_filters===true;state.canByteWindows=caps.features.evidence_byte_windows===true;state.canRunCompare=caps.features.run_comparison===true;uiText($('protocol'),uiMessage("Protocol {0}",{"0":caps.preflight_protocol.version}));if(!caps.features.project_pipeline_history||!caps.features.experiments||!caps.features.calendar_schedules||!caps.features.schedule_editing||!caps.features.evidence_retrieval||!caps.features.acceptance_criteria||!caps.features.catalog_pagination||!caps.features.client_sse||!caps.features.global_executions||!caps.features.pipeline_editor)throw uiError(uiMessage("This client requires Preflight protocol 1.43 or later. Update the server."));await loadProjects();}catch(e){notice(e);}

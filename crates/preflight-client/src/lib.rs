@@ -4,6 +4,15 @@ use axum::{Router, http::header, routing::get};
 pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
+            "/notification-center.mjs",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+                    include_str!("notification-center.mjs"),
+                )
+            }),
+        )
+        .route(
             "/releases.mjs",
             get(|| async {
                 (
@@ -258,7 +267,8 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
 pub fn is_asset(path: &str) -> bool {
     matches!(
         path,
-        "/releases.mjs"
+        "/notification-center.mjs"
+            | "/releases.mjs"
             | "/environment-editor.mjs"
             | "/favicon-32.png"
             | "/apple-touch-icon.png"
