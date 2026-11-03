@@ -51,6 +51,12 @@ export function describeLogLine(line){
  return {value,title,meta:meta.join(' · '),messages:limited,tone:typeof value.passed==='boolean'?(value.passed?'passed':'failed'):null};
 }
 
+export function logTone(text){
+ // stderr is a transport stream, not a diagnostic severity.
+ if(/\b(?:fatal error|error)(?:\[[^\]\n]*\])?\s*:/i.test(text))return 'log-error';
+ if(/\bwarning(?:\[[^\]\n]*\])?\s*:/i.test(text))return 'log-warning';
+ return '';
+}
 export function mountConsole(container,{copyCode,virtual=false}={}){
  let model=new ConsoleLines(),raw=false;const nodes=new Map();
  const node=(tag,text,cls)=>{const element=container.ownerDocument.createElement(tag);if(text!==undefined)element.textContent=text;if(cls)element.className=cls;return element;};
@@ -62,7 +68,7 @@ export function mountConsole(container,{copyCode,virtual=false}={}){
   const header=node('div',undefined,'console-meta'),date=new Date(line.timestamp);
   if(Number.isFinite(date.getTime()))header.append(node('time',date.toLocaleTimeString('en-GB',{hour12:false})));
   header.append(node('span',line.stage+' / '+line.stream));row.append(header);
-  if(!description){row.append(node('span',line.text,line.stream==='stderr'?'console-message log-stderr':'console-message'));return row;}
+  if(!description){row.append(node('span',line.text,('console-message '+logTone(line.text)).trim()));return row;}
   const heading=node('div',undefined,'console-record-heading');heading.append(node('strong',description.title));
   if(description.meta)heading.append(node('span',description.meta,'console-record-meta'));
   if(description.tone)heading.dataset.check=description.tone;

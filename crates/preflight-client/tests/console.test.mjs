@@ -57,3 +57,13 @@ test('evicted partial records never become invented JSON records on continuation
  model.append([event('{"message":"next real record"}\n')]);
  assert.equal(describeLogLine(model.lines.at(-1)).title,'next real record');
 });
+
+test('diagnostic colors follow severity, never the stderr stream',async()=>{
+ const {logTone}=await import('../src/console.mjs');
+ assert.equal(logTone('/src/a.sx:12:3: warning[types.unused]: unused name'),'log-warning');
+ assert.equal(logTone('warning: unused import'),'log-warning');
+ assert.equal(logTone('/src/a.c:4: error: undefined symbol'),'log-error');
+ assert.equal(logTone('fatal error: missing include'),'log-error');
+ assert.equal(logTone('  12 | let source = value;'),'');
+ assert.equal(logTone('progress: compiling module'),'');
+});

@@ -15,3 +15,15 @@ test('page refresh with the same route does not reanimate',()=>{
  globalThis.matchMedia=()=>({matches:false});const page=dialog(Promise.resolve());animatePage(page,'/pipelines');animatePage(page,'/pipelines');assert.equal(page.animations,1);animatePage(page,'/experiments');assert.equal(page.animations,2);
  globalThis.matchMedia=()=>({matches:true});animatePage(page,'/schedules');assert.equal(page.animations,2);
 });
+
+test('dragging a stage moves its edges and returns to layout on release or cancellation',async()=>{
+ const {elasticDrag}=await import('../src/interactions.mjs'),handlers=new Map();let redraws=0;
+ const node={style:{},addEventListener:(name,fn)=>handlers.set(name,fn),setPointerCapture(){}};
+ elasticDrag(node,()=>.5,()=>redraws++);
+ const event={button:0,pointerId:7,clientX:10,clientY:20,preventDefault(){},stopImmediatePropagation(){this.stopped=true;}};
+ handlers.get('pointerdown')(event);handlers.get('pointermove')({...event,clientX:30,clientY:35});
+ assert.equal(node.style.transform,'translate(40px,30px)');assert.equal(redraws,1);
+ handlers.get('pointerup')(event);assert.equal(node.style.transform,'');assert.equal(redraws,2);
+ handlers.get('click')(event);assert.equal(event.stopped,true);
+ handlers.get('pointerdown')(event);handlers.get('pointermove')({...event,clientX:40});handlers.get('pointercancel')(event);assert.equal(node.style.transform,'');
+});

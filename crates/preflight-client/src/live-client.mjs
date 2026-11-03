@@ -15,17 +15,22 @@ export function liveSource(){const source=new EventTarget();source.close=()=>{so
 addEventListener('pagehide',disconnect);addEventListener('pageshow',connect);document.addEventListener('visibilitychange',()=>document.hidden?disconnect():connect());
 
 // Elapsed time advances locally even when a quiet build emits no SSE events.
-export function elapsedText(start,end,now=Date.now()){
- const ms=Math.max(0,(end??now)-start);
- const value=ms<1000?Math.round(ms)+' ms':ms<60000?(ms/1000).toFixed(1)+' s':Math.floor(ms/60000)+' min '+Math.floor(ms%60000/1000)+' s';
- return value+' elapsed'+(end==null?' · updating':'');
+export function durationText(ms){
+ if(!Number.isFinite(ms)||ms<0)return '—';
+ if(ms<1000)return Math.round(ms)+' ms';
+ if(ms<60000)return (ms/1000).toFixed(1)+' s';
+ return (ms>=3600000?Math.floor(ms/3600000)+' h ':'')+Math.floor(ms/60000)%60+' min '+Math.floor(ms%60000/1000)+' s';
 }
-export function elapsedNode(node,start,end){
+export function elapsedText(start,end,now=Date.now()){
+ return durationText(Math.max(0,(end??now)-start))+' elapsed'+(end==null?' · updating':'');
+}
+export function elapsedNode(node,start,end,compact=false){
  node.dataset.elapsedStart=String(start);
+ node.dataset.elapsedCompact=String(compact);
  if(end==null)delete node.dataset.elapsedEnd;else node.dataset.elapsedEnd=String(end);
- node.textContent=elapsedText(start,end);return node;
+ node.textContent=compact?durationText(Math.max(0,(end??Date.now())-start)):elapsedText(start,end);return node;
 }
 export function tickElapsed(root=document,now=Date.now()){
  if(document.hidden)return;
- for(const node of root.querySelectorAll('[data-elapsed-start]:not([data-elapsed-end])'))node.textContent=elapsedText(Number(node.dataset.elapsedStart),null,now);
+ for(const node of root.querySelectorAll('[data-elapsed-start]:not([data-elapsed-end])'))node.textContent=node.dataset.elapsedCompact==='true'?durationText(Math.max(0,now-Number(node.dataset.elapsedStart))):elapsedText(Number(node.dataset.elapsedStart),null,now);
 }

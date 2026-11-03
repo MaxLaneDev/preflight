@@ -47,3 +47,19 @@ acceptance:
 
 Inspect the run's Acceptance tab. Incomplete/missing evidence does not satisfy
 this criterion even when the process exits zero.
+
+## Why is the Tests tab empty?
+
+Preflight reads fixture results and declared JUnit or Preflight JSON reports.
+It does not infer cases from command names, successful exits, or arbitrary console output.
+Mark test commands `kind: test`, choose `testing.kind`, and configure the report path.
+The command must generate that report. Reports belong to the recorded run; changing a
+pipeline does not rewrite old results.
+
+Each command has `timeout_seconds` (default 300, allowed 1–3600). This is an execution
+deadline, not a queue wait limit or a limit on the sum of all stages. Timeout terminates
+the process tree and records `timed_out`.
+
+```json
+{"id":"integration","kind":"test","command":{"program":"./run-tests.sh","timeout_seconds":1800},"testing":{"kind":"integration","reports":[{"format":"junit","path":"results.xml"}]}}
+```

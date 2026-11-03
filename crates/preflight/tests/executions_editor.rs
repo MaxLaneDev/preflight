@@ -460,3 +460,59 @@ fn now() -> i64 {
         .unwrap()
         .as_millis() as i64
 }
+
+#[tokio::test]
+async fn all_view_pages_active_planned_and_finished_without_duplicates() {
+    let f = common::Fixture::new();
+    save(&f, "base", 0, false);
+    experiment(&f, "trial", "base");
+    let request = serde_json::from_value(json!({"project_id":f.project.id,"name":"future","pipeline":{"name":"base","revision":1},"experiment":{"name":"trial","revision":1},"at_ms":now()+3600000,"grace_ms":60000,"misfire":"run_once","request_id":"all-future","actor":"user","reason":"test combined view"})).unwrap();
+    let scheduled = schedules::create(&f.engine, &request).unwrap();
+    let done = f
+        .engine
+        .start_pipeline(
+            serde_json::from_value(
+                json!({"project_id":f.project.id,"definition":definition(false)}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    common::finished(&f.engine, &done.id).await;
+    let active = f
+        .engine
+        .start_pipeline(
+            serde_json::from_value(
+                json!({"project_id":f.project.id,"definition":definition(true)}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut q = query(Some(&f.project.id), "all", "all");
+    q.limit = 1;
+    let mut items = Vec::new();
+    loop {
+        let page = x::list(&f.engine, &q).unwrap();
+        items.extend(page["items"].as_array().unwrap().clone());
+        q.after = page["next_cursor"].as_str().map(str::to_owned);
+        if q.after.is_none() {
+            break;
+        }
+    }
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0]["target_id"], active.id);
+    assert_eq!(items[1]["target_id"], scheduled["schedule_id"]);
+    assert_eq!(items[2]["target_id"], done.id);
+    assert_eq!(
+        x::list(&f.engine, &query(Some(&f.project.id), "all", "experiment")).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    x::cancel(
+        &f.engine,
+        &cancel(&f.project.id, "run", &active.id, None, None),
+    )
+    .unwrap();
+    common::finished(&f.engine, &active.id).await;
+}

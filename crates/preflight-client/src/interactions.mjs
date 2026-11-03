@@ -28,6 +28,20 @@ export function animatePage(node,key){
  pages.set(node,key);
  animate(node,[{opacity:.6,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],120);
 }
+export function elasticDrag(node,scale,redraw){
+ let drag=null,suppressClick=false;
+ node.addEventListener('pointerdown',event=>{if(event.button!==0||event.isPrimary===false)return;drag={id:event.pointerId,x:event.clientX,y:event.clientY,moved:false};suppressClick=false;});
+ node.addEventListener('pointermove',event=>{
+  if(!drag||drag.id!==event.pointerId)return;
+  const x=event.clientX-drag.x,y=event.clientY-drag.y;
+  if(!drag.moved&&Math.hypot(x,y)<4)return;
+  drag.moved=true;node.setPointerCapture(event.pointerId);event.preventDefault();
+  node.style.transform=`translate(${x/scale()}px,${y/scale()}px)`;redraw();
+ });
+ const release=()=>{if(!drag)return;suppressClick=drag.moved;drag=null;node.style.transform='';redraw();};
+ for(const name of ['pointerup','pointercancel','lostpointercapture'])node.addEventListener(name,release);
+ node.addEventListener('click',event=>{if(suppressClick){event.preventDefault();event.stopImmediatePropagation();suppressClick=false;}},true);
+}
 export function installDialogInteractions(root=document){
  const enhanced=new WeakSet();
  function enhance(dialog){

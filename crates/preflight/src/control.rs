@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 pub const PROTOCOL_MAJOR: u32 = 1;
-pub const PROTOCOL_MINOR: u32 = 73;
+pub const PROTOCOL_MINOR: u32 = 74;
 pub const PROTOCOL_PATCH: u32 = 0;
-pub const PROTOCOL_VERSION: &str = "1.73.0";
+pub const PROTOCOL_VERSION: &str = "1.74.0";
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectId {
@@ -99,6 +99,7 @@ pub fn capabilities(e: &Engine) -> Value {
     features["scoped_management"] = true.into();
     features["recoverable_deletion"] = true.into();
     features["global_executions"] = true.into();
+    features["executions_all_view"] = true.into();
     features["experiment_schedules"] = true.into();
     features["pipeline_editor"] = true.into();
     features["client_sse"] = true.into();

@@ -44,7 +44,7 @@ const RUNS: &str = "SELECT r.id AS key,r.id AS target_id,'run' AS target_kind,r.
 const PLANNED: &str = "SELECT 's:'||printf('%020d',s.at_ms)||':'||s.id AS key,s.id AS target_id,'schedule' AS target_kind,s.project_id,p.name AS project_name,json_extract(s.request_json,'$.name') AS name,CASE WHEN json_extract(s.request_json,'$.experiment.name') IS NULL THEN 'pipeline' ELSE 'experiment' END AS kind,s.state,s.at_ms,s.run_id,'saved:'||json_extract(s.request_json,'$.pipeline.name') AS pipeline_key,json_extract(s.request_json,'$.experiment.name') AS experiment_name,s.revision,NULL AS ordinal,0 AS total,0 AS done FROM schedules s JOIN projects p ON p.id=s.project_id WHERE s.state IN ('pending','paused','dispatching') AND NOT EXISTS(SELECT 1 FROM schedule_hidden h WHERE h.schedule_id=s.id) UNION ALL SELECT 'q:'||q.id||':'||printf('%010d',i.ordinal),q.id,'queue_item',q.project_id,p.name,i.name,'pipeline',i.state,0,i.run_id,'',NULL,NULL,i.ordinal,0,0 FROM change_queue_items i JOIN change_queues q ON q.id=i.queue_id JOIN projects p ON p.id=q.project_id WHERE q.state IN ('active','cancelling') AND i.state='pending'";
 pub fn list(e: &Engine, q: &Query) -> Result<Value> {
     ensure!(
-        matches!(q.view.as_str(), "active" | "planned" | "recent")
+        matches!(q.view.as_str(), "all" | "active" | "planned" | "recent")
             && matches!(q.kind.as_str(), "all" | "pipeline" | "experiment")
             && (1..=100).contains(&q.limit)
             && q.query.len() <= 256
@@ -55,7 +55,13 @@ pub fn list(e: &Engine, q: &Query) -> Result<Value> {
     if let Some(id) = &q.project_id {
         e.db.project(id)?;
     }
-    let mut base = if q.view == "planned" {
+    let mut base = if q.view == "all" {
+        let runs = RUNS.replace("r.id AS key", &format!("CASE WHEN r.status IN {ACTIVE} THEN '0:'||r.id ELSE '2:'||printf('%020d',999999999999999-r.created_at)||':'||r.id END AS key"));
+        let planned = PLANNED.replace("'s:'", "'1:s:'").replace("'q:'", "'1:q:'");
+        format!(
+            "{runs} AND NOT EXISTS(SELECT 1 FROM management_trash t WHERE t.project_id=r.project_id AND t.kind='run' AND t.target_id=r.id AND t.restored_at IS NULL) UNION ALL {planned} UNION ALL SELECT '2:'||printf('%020d',999999999999999-i.finished_at)||':queue:'||q.id||':'||i.ordinal,q.id,'queue_item',q.project_id,p.name,i.name,'pipeline',i.state,i.finished_at,NULL,'',NULL,NULL,i.ordinal,0,0 FROM change_queue_items i JOIN change_queues q ON q.id=i.queue_id JOIN projects p ON p.id=q.project_id WHERE i.run_id IS NULL AND i.finished_at>=?6"
+        )
+    } else if q.view == "planned" {
         PLANNED.to_owned()
     } else {
         format!(

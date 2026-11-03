@@ -42,3 +42,15 @@ test('queue state refreshes after a transition while its search control keeps fo
  const refresh=runInNewContext(body+';refreshSummary',context);
  await refresh();state='succeeded';await refresh();assert.equal(loads,2);
 });
+
+test('hour durations and compact stage clocks advance locally',async()=>{
+ globalThis.document=Object.assign(new EventTarget(),{hidden:false});globalThis.addEventListener=()=>{};
+ try{
+  const {durationText,elapsedNode,tickElapsed}=await import('../src/live-client.mjs');
+  assert.equal(durationText(3813000),'1 h 3 min 33 s');
+  assert.equal(durationText(86400000),'24 h 0 min 0 s');
+  const stage={dataset:{}};elapsedNode(stage,1000,null,true);
+  tickElapsed({querySelectorAll:()=>[stage]},3814000);assert.equal(stage.textContent,'1 h 3 min 33 s');
+  elapsedNode(stage,1000,4000,true);assert.equal(stage.textContent,'3.0 s');assert.equal(stage.dataset.elapsedEnd,'4000');
+ }finally{delete globalThis.document;delete globalThis.addEventListener;}
+});

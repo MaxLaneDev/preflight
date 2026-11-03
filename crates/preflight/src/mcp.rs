@@ -1225,7 +1225,7 @@ impl Mcp {
     }
 
     #[tool(
-        description = "Observe cross-project active, planned or recent work; paginated metadata and stage-based progress, including experiments."
+        description = "Observe cross-project all, active, planned or recent work; paginated metadata and stage-based progress, including experiments. All orders active, planned, then finished work."
     )]
     fn executions_list(
         &self,

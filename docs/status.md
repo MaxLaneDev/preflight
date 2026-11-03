@@ -30,3 +30,10 @@ cargo test --release --locked --workspace
 node --test crates/preflight-client/tests/*.test.mjs
 sh scripts/test-release.sh
 ```
+
+### Execution UI corrections (protocol 1.74)
+
+All execution states can be paged together. Stage clocks advance locally between
+SSE events. Diagnostic colors use warning/error severity instead of stderr. Graph
+stages can be pulled temporarily; release restores layout and connections. Workspace
+management is under the workspace selector. Missing test evidence links to report setup.

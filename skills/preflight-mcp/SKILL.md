@@ -109,7 +109,7 @@ For log investigation use evidence_search with project_id and optional run_id, s
 
 For large navigation lists use catalog_list: kind=workspaces|pipelines|saved_pipelines|experiments, project_id when scoped, query, limit (default25/max100), after=returned next_cursor. Preserve the same filter while paging; fetch definition details only after choosing a returned name/revision.
 
-Cross-project work: executions_list(view=active|planned|recent, kind=all|pipeline|experiment, optional project_id/query/after/limit). Retain each row ownership and target reference. executions_summary returns since: reuse it to observe one progress cohort. executions_cancel requires project_id, target_kind=run|queue_item|queue|schedule, target_id, actor and reason; use ordinal for a change item and revision for a schedule. Never widen selected cancellation. Check actual terminal state after requesting stop. pipeline_check validates JSON text; pipeline_revisions pages immutable history; pipeline_restore creates a new revision with an explicit expected_revision. Future experiment schedules pin experiment plus its matching base pipeline and use the saved experiment profile.
+Cross-project work: executions_list(view=all|active|planned|recent, kind=all|pipeline|experiment, optional project_id/query/after/limit). Retain each row ownership and target reference. executions_summary returns since: reuse it to observe one progress cohort. executions_cancel requires project_id, target_kind=run|queue_item|queue|schedule, target_id, actor and reason; use ordinal for a change item and revision for a schedule. Never widen selected cancellation. Check actual terminal state after requesting stop. pipeline_check validates JSON text; pipeline_revisions pages immutable history; pipeline_restore creates a new revision with an explicit expected_revision. Future experiment schedules pin experiment plus its matching base pipeline and use the saved experiment profile.
 
 Manual maintenance: management_preview(project_id, action=clear_queue|artifacts|delete_pipeline|delete_run, optional target_id/pipeline_key). Keep the exact returned plan and execute_tool. Apply management plans with management_execute(project_id,plan_id,request_id,actor,reason); artifact expiry uses storage_gc_execute. Repeat only an identical execute for replay. Re-preview next batches; do not widen scope. Trash is recoverable, does not free artifact bytes, and retains existing revision/evidence references. management_trash pages deleted project objects; management_restore restores one exact kind/target. Clear pending queue skips progressed/edited items and leaves active work running.
 
@@ -184,3 +184,11 @@ to disable cleanup. Do not enable disk cleanup for a read-only probe.
 For category retention, ranked physical cache eviction or disk admission (1.55+),
 read [storage](references/storage.md). Never confuse logical log payload expiry
 with filesystem space reclaimed or invalidate_entries with physical output eviction.
+
+Protocol 1.74 adds executions_list view=all (active, planned, then finished).
+For test submissions, set stage kind=test and declare JUnit or testing.reports; ensure
+the command writes that report. Exit status is not per-test evidence. Native fixtures
+report their own cases. Experiments are explicit saved experiment definitions/runs,
+not automatically inferred from a pipeline name or optimization flag. Use experiment_save
+and experiment_start for work intended to appear under Experiments. Never relabel old runs
+or modify an active pipeline to invent missing evidence.
