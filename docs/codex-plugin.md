@@ -35,8 +35,8 @@ No public OpenAI directory submission is planned.
 Use a server archive from the same version as the packaging binary:
 
 ```sh
-preflight package plugin-stdio output/preflight-0.1.3-macos-aarch64.tar.gz \
-  --sha256 "$(awk 'NR==1 {print $1}' output/preflight-0.1.3-macos-aarch64.tar.gz.sha256)" \
+preflight package plugin-stdio output/preflight-0.1.4-macos-aarch64.tar.gz \
+  --sha256 "$(awk 'NR==1 {print $1}' output/preflight-0.1.4-macos-aarch64.tar.gz.sha256)" \
   --repository "$PWD" --destination output/preflight-stdio-macos-aarch64.zip
 ```
 
@@ -46,7 +46,7 @@ and `mcp.json`. Its launch command uses the bundled binary, not a binary found o
 hooks are required. The server's database and credentials stay outside the ZIP.
 Choose this package or the HTTP plugin above; do not enable both connections.
 
-Each archive targets one platform. The 0.1.3 release supports macOS ARM64/x86_64,
+Each archive targets one platform. The 0.1.4 release supports macOS ARM64/x86_64,
 Linux ARM64/x86_64 and Windows x86_64. Use a matching archive; Windows uses
 `./bin/preflight.exe`. The input checksum and package contents
 are verified before writing the ZIP. Existing destinations are never replaced.

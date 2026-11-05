@@ -116,7 +116,7 @@ Commands run with the server account's permissions. Run trusted projects only.
 - [Logs and search](docs/evidence.md) · [Cleanup](docs/storage-gc.md) · [Archives](docs/run-archives.md)
 - [All guides](docs/README.md)
 
-Preflight 0.1.3 packages cover macOS ARM64/x86_64, Linux ARM64/x86_64 and Windows x86_64.
+Preflight 0.1.4 packages cover macOS ARM64/x86_64, Linux ARM64/x86_64 and Windows x86_64.
 See [installation](docs/installation.md) for curl, PowerShell and Homebrew.
 Physical remote x86_64 worker acceptance remains separate. Future work includes workers
 that connect through NAT without inbound ports.
