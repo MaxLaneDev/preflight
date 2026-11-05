@@ -65,3 +65,69 @@ test('completion notifications drain event pages without skipping events or dupl
  source.dispatchEvent(new MessageEvent('change',{data:'{"hint":true}'}));await new Promise(setImmediate);await new Promise(setImmediate);
  assert.equal(notices.length,105);assert.equal(new Set(notices).size,105);assert.equal(notices.at(-1),'Preflight: run run-105 completed — succeeded.');
 });
+
+test('workspace catalog reload preserves All workspaces with a project selected',async()=>{
+ const option=(textContent,value)=>({textContent,value,dataset:{}});
+ const listeners={};
+ let refresh;
+ const select={
+  options:[option('All workspaces',''),option('Strox','strox')],
+  value:'strox',dataset:{},isConnected:true,
+  get selectedOptions(){return this.options.filter(option=>option.value===this.value);},
+  replaceChildren(...options){this.options=options;},
+  append(option){this.options.push(option);},
+  addEventListener(name,handler){listeners[name]=handler;}
+ };
+ const remoteChoices=runInNewContext('('+extract('function remoteChoices(','const pipelineListName=')+')',{
+  AbortController,state:{project:'strox'},query:()=>'',syncSelects(){},
+  api:async()=>({items:[{id:'other',name:'Other'}],next_cursor:null}),
+  cloneChoice:item=>item&&option(item.textContent,item.value),uiOption:option,
+  setTimeout:callback=>{refresh=callback;},clearTimeout(){}
+ });
+ remoteChoices(select,'workspaces');
+ listeners['choices-search']({detail:''});
+ refresh();
+ await new Promise(setImmediate);
+ assert.deepEqual(select.options.map(option=>option.value),['','other','strox']);
+ assert.equal(select.value,'strox');
+});
+
+test('any open dialog or custom selector defers page refresh without losing edits',async()=>{
+ for(const selector of ['dialog[open]','.select-menu:popover-open','.row-menu[open]']){
+  const context={state:{section:'pipelines',project:'p'},document:{hidden:false,querySelector:query=>query.includes(selector)?{}:null},settingsActive:false,polling:false,$:()=>({}),refreshCatalog:()=>{throw Error('Must not repaint an open control');}};
+  await runInNewContext('('+extract('async function pollCurrentPage(',"setInterval(()=>{if(!liveConnected")+')',context)({eventDriven:true});
+ }
+});
+
+test('unchanged history retains the current run selector',async()=>{
+ const runs=[{run_id:'a',status:'running'}];let renders=0;
+ const context={state:{pipeline:{pipeline_key:'key'},epoch:1,history:runs,historyNext:null},api:async()=>({runs,next_cursor:null}),query:()=>'',JSON,Set,$:()=>({}),renderHistory:()=>renders++};
+ const load=runInNewContext('('+extract('async function loadHistory(','function renderHistory(')+')',context);
+ await load();assert.equal(renders,0);
+ runs[0]={run_id:'a',status:'succeeded'};context.state.history=[{run_id:'a',status:'running'}];
+ await load();assert.equal(renders,1);
+});
+
+test('background view failures keep existing evidence and request a later retry',async()=>{
+ const view={scrollTop:120,replaceChildren(){throw Error('Existing content was removed');}},state={epoch:1,tab:'Tests'};let error;
+ const context={state,$:id=>id==='view'?view:{},el:()=>({}),renderViewContent:async()=>{throw Error('Connection lost');},uiAttribute:(_node,_key,value)=>error=value};
+ const render=runInNewContext('('+extract('async function renderView(','async function renderViewContent(')+')',context);
+ await render({background:true});assert.equal(state.viewDirty,true);assert.equal(view.scrollTop,120);assert.equal(error,'Connection lost');
+});
+
+test('discard confirmation is nonblocking and keeps edits unless explicitly discarded',()=>{
+ const closed=[],editor={},nodes=[];let dirty=true;
+ const el=(tag,text)=>({tag,text,children:[],classList:{add(){}},setAttribute(){},append(...children){this.children.push(...children);},addEventListener(){},showModal(){this.open=true;},focus(){this.focused=true;}});
+ const context={state:{editorKind:'pipeline'},editorDirty:()=>dirty,$:()=>editor,closeDialog:node=>closed.push(node),document:{getElementById:()=>null,body:{append:node=>nodes.push(node)}},el,button:(text,click)=>Object.assign(el('button',text),{click})};
+ const close=runInNewContext('('+extract('function requestEditorClose(','function setEditorMode(')+')',context);
+ close();assert.equal(closed.length,0);const dialog=nodes[0],[keep,discard]=dialog.children[1].children;
+ assert.equal(dialog.open,true);assert.equal(keep.focused,true);keep.click();assert.deepEqual(closed,[dialog]);discard.click();assert.equal(closed.at(-1),editor);
+ dirty=false;close();assert.equal(closed.at(-1),editor);
+});
+
+test('clearing a pipeline closes its dialog without hiding an open modal',()=>{
+ const editor={open:true,hidden:false},nodes={editor,history:{replaceChildren(){}},edit:{},start:{},'more-history':{}};let requested=false;
+ const context={state:{},$:id=>nodes[id],clearRun(){},closeDialog:dialog=>{assert.equal(dialog,editor);requested=true;return new Promise(()=>{});}};
+ runInNewContext('('+extract('function clearPipeline(','async function loadProjects(')+')',context)();
+ assert.equal(requested,true);assert.equal(editor.hidden,false);
+});

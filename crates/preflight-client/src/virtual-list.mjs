@@ -1,6 +1,6 @@
 // Variable-height rows, bounded DOM, and a stable visible anchor when pages arrive.
-export function mountVirtualList(view,{render,key,estimate=32,windowSize=100,host=view,tag='div'}){
- let items=[],heights=new Map(),prefix=[0],frame=0,drawing=false,destroyed=false;
+export function mountVirtualList(view,{render,key,estimate=32,windowSize=100,host=view,tag='div',version=()=>null}){
+ let items=[],versions=new WeakMap(),heights=new Map(),prefix=[0],frame=0,drawing=false,destroyed=false;
  const doc=view.ownerDocument,top=doc.createElement(tag),body=doc.createElement(tag),bottom=doc.createElement(tag);if(tag==='tbody')for(const spacer of [top,bottom]){spacer.innerHTML='<tr><td colspan=4 style="padding:0;border:0;height:inherit"></td></tr>';spacer.className='virtual-table-spacer';}
  top.setAttribute('aria-hidden','true');bottom.setAttribute('aria-hidden','true');host.append(top,body,bottom);view.style.overflowAnchor='none';
  const offsets=()=>{prefix=[0];for(const item of items)prefix.push(prefix.at(-1)+(heights.get(key(item))||estimate));};
@@ -10,14 +10,19 @@ export function mountVirtualList(view,{render,key,estimate=32,windowSize=100,hos
   const anchor=indexAt(position),delta=position-prefix[anchor];
   const start=end?Math.max(0,items.length-windowSize):Math.max(0,Math.min(anchor-10,items.length-windowSize));
   const stop=Math.min(items.length,start+windowSize),old=new Map([...body.children].map(n=>[n.dataset.virtualKey,n]));
-  const rows=items.slice(start,stop).map(item=>{const k=String(key(item)),row=old.get(k)||render(item);row.dataset.virtualKey=k;return row;});
-  if(rows.length!==body.children.length||rows.some((row,index)=>row!==body.children[index]))body.replaceChildren(...rows);top.style.height=prefix[start]+'px';bottom.style.height=(prefix.at(-1)-prefix[stop])+'px';
-  for(let n=0;n<rows.length;n++)heights.set(key(items[start+n]),Math.max(1,rows[n].getBoundingClientRect().height));
+  const rows=items.slice(start,stop).map(item=>{const k=String(key(item)),previous=old.get(k),stamp=version(item),row=previous&&versions.get(previous)===stamp?previous:render(item);versions.set(row,stamp);row.dataset.virtualKey=k;return row;});
+  if(rows.length!==body.children.length||rows.some((row,index)=>row!==body.children[index])){
+   const active=doc.activeElement,focused=active&&[...body.children].find(row=>row.contains(active)),selector='button,input,select,textarea,a[href],[tabindex]';
+   const focusIndex=focused?[...focused.querySelectorAll(selector)].indexOf(active):-1;
+   body.replaceChildren(...rows);
+   if(focused&&doc.activeElement!==active){const row=rows.find(row=>row.dataset.virtualKey===focused.dataset.virtualKey);(active===focused?row:row?.querySelectorAll(selector)[focusIndex])?.focus({preventScroll:true});}
+  }top.style.height=prefix[start]+'px';bottom.style.height=(prefix.at(-1)-prefix[stop])+'px';
+  for(let n=0;n<rows.length;n++){const height=rows[n].getBoundingClientRect().height;if(height>0)heights.set(key(items[start+n]),height);}
   offsets();top.style.height=prefix[start]+'px';bottom.style.height=(prefix.at(-1)-prefix[stop])+'px';
   view.scrollTop=end?view.scrollHeight:prefix[anchor]+delta;drawing=false;
  }
  const onScroll=()=>{if(!frame&&!destroyed)frame=requestAnimationFrame(()=>{frame=0;draw();});};view.addEventListener('scroll',onScroll,{passive:true});
- const observer=new ResizeObserver(()=>{if(view.isConnected)draw(view.scrollHeight-view.clientHeight-view.scrollTop<2);});observer.observe(view);observer.observe(body);
+ const observer=new ResizeObserver(()=>{if(view.isConnected&&view.clientHeight>0)draw(view.scrollTop>0&&view.scrollHeight-view.clientHeight-view.scrollTop<2);});observer.observe(view);observer.observe(body);
  return {
   setItems(next,{end=false,redraw=false}={}){
    const index=indexAt(view.scrollTop),anchor=items[index]&&key(items[index]),delta=view.scrollTop-prefix[index];items=next.slice();
@@ -46,8 +51,8 @@ export function mountInfiniteScroll(view,load,{host=view}={}){
 }
 
 // Keep card grids responsive while windowing complete rows rather than individual columns.
-export function mountVirtualCards(view,{host=view,render,key,minWidth=280,gap=18,estimate=240}){
- let items=[],columns=0;const list=mountVirtualList(view,{host,key:row=>key(row[0]),estimate,windowSize:40,render:row=>{const group=view.ownerDocument.createElement('div');group.className='virtual-card-row';group.style.gridTemplateColumns=`repeat(${columns},minmax(0,1fr))`;group.style.gap=gap+'px';group.append(...row.map(render));return group;}});
+export function mountVirtualCards(view,{host=view,render,key,minWidth=280,gap=18,estimate=240,version=()=>null}){
+ let items=[],columns=0;const list=mountVirtualList(view,{host,key:row=>key(row[0]),version:row=>JSON.stringify(row.map(version)),estimate,windowSize:40,render:row=>{const group=view.ownerDocument.createElement('div');group.className='virtual-card-row';group.style.gridTemplateColumns=`repeat(${columns},minmax(0,1fr))`;group.style.gap=gap+'px';group.append(...row.map(render));return group;}});
  function update(){const next=Math.max(1,Math.floor((host.clientWidth+gap)/(minWidth+gap))),changed=next!==columns;columns=next;const rows=[];for(let i=0;i<items.length;i+=columns)rows.push(items.slice(i,i+columns));list.setItems(rows,{redraw:changed});}
  const observer=new ResizeObserver(()=>{if(host.isConnected)update();});observer.observe(host);
  return {setItems(next){items=next.slice();update();},destroy(){observer.disconnect();list.destroy();}};

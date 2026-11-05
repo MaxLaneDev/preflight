@@ -228,3 +228,38 @@ fn workspace_and_pipeline_search_match_ids_paths_unicode_and_trimmed_terms() {
             .is_empty()
     );
 }
+
+#[test]
+fn pipeline_and_execution_pages_order_by_completion_not_creation() {
+    let f = common::Fixture::new();
+    let c = rusqlite::Connection::open(f.engine.config.data_dir.join("preflight.sqlite3")).unwrap();
+    for (id, key, created, finished) in [
+        ("older", "definition:z", 1, 500),
+        ("newer", "definition:a", 2, 300),
+    ] {
+        c.execute("INSERT INTO runs(id,project_id,status,command_json,created_at,finished_at,workspace) VALUES (?1,?2,'succeeded','{}',?3,?4,'')",rusqlite::params![id,f.project.id,created,finished]).unwrap();
+        c.execute(
+            "INSERT INTO run_pipeline_identity(run_id,pipeline_key,name) VALUES (?1,?2,?2)",
+            rusqlite::params![id, key],
+        )
+        .unwrap();
+    }
+    let first = catalog::list(
+        &f.engine,
+        &serde_json::from_value(json!({"kind":"pipelines","project_id":f.project.id,"limit":1}))
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(first["items"][0]["pipeline_key"], "definition:z");
+    let second = catalog::list(&f.engine,&serde_json::from_value(json!({"kind":"pipelines","project_id":f.project.id,"limit":1,"after":first["next_cursor"]})).unwrap()).unwrap();
+    assert_eq!(second["items"][0]["pipeline_key"], "definition:a");
+    assert!(second["next_cursor"].is_null());
+    for view in ["all", "recent"] {
+        let rows = preflight::executions::list(
+            &f.engine,
+            &serde_json::from_value(json!({"view":view,"project_id":f.project.id})).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rows["items"][0]["target_id"], "older");
+    }
+}

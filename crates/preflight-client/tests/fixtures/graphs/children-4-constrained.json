@@ -1,0 +1,45 @@
+[
+  {
+    "id": "upstream",
+    "needs": [
+
+    ]
+  },
+  {
+    "id": "parent",
+    "needs": [
+      "upstream"
+    ]
+  },
+  {
+    "id": "child-1",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-2",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-3",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-4",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "shared-result",
+    "needs": [
+      "upstream",
+      "child-4"
+    ]
+  }
+]

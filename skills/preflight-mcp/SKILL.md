@@ -192,3 +192,8 @@ report their own cases. Experiments are explicit saved experiment definitions/ru
 not automatically inferred from a pipeline name or optimization flag. Use experiment_save
 and experiment_start for work intended to appear under Experiments. Never relabel old runs
 or modify an active pipeline to invent missing evidence.
+
+Catalog pipeline pages are ordered by latest recorded completion, newest first;
+never-started definitions follow. Treat cursors as opaque and retain each item's
+pipeline_key as its identity. Execution All keeps active/planned work first and
+orders finished runs by completion time.

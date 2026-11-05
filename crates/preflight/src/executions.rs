@@ -56,7 +56,7 @@ pub fn list(e: &Engine, q: &Query) -> Result<Value> {
         e.db.project(id)?;
     }
     let mut base = if q.view == "all" {
-        let runs = RUNS.replace("r.id AS key", &format!("CASE WHEN r.status IN {ACTIVE} THEN '0:'||r.id ELSE '2:'||printf('%020d',999999999999999-r.created_at)||':'||r.id END AS key"));
+        let runs = RUNS.replace("r.id AS key", &format!("CASE WHEN r.status IN {ACTIVE} THEN '0:'||r.id ELSE '2:'||printf('%020d',999999999999999-COALESCE(r.finished_at,r.created_at))||':'||r.id END AS key"));
         let planned = PLANNED.replace("'s:'", "'1:s:'").replace("'q:'", "'1:q:'");
         format!(
             "{runs} AND NOT EXISTS(SELECT 1 FROM management_trash t WHERE t.project_id=r.project_id AND t.kind='run' AND t.target_id=r.id AND t.restored_at IS NULL) UNION ALL {planned} UNION ALL SELECT '2:'||printf('%020d',999999999999999-i.finished_at)||':queue:'||q.id||':'||i.ordinal,q.id,'queue_item',q.project_id,p.name,i.name,'pipeline',i.state,i.finished_at,NULL,'',NULL,NULL,i.ordinal,0,0 FROM change_queue_items i JOIN change_queues q ON q.id=i.queue_id JOIN projects p ON p.id=q.project_id WHERE i.run_id IS NULL AND i.finished_at>=?6"

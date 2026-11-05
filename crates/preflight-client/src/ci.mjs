@@ -17,7 +17,7 @@ export function installExternalCI({api,el,button,query,copy,notice,target,openRu
  async function show(project){hide();target.hidden=false;const g=generation;
   if(!canUse()){target.replaceChildren(el('p','External CI import is unavailable on this server.','empty-state'));return;}
   const controls=el('div',undefined,'ci-controls'),source=el('select'),status=el('p','','muted'),credential=el('p','','muted'),imports=el('div',undefined,'ci-imports'),rows=el('div',undefined,'ci-runs');
-  let remoteCursor=null,before=null,loading=false,signature=null;
+  let remoteCursor=null,before=null,loading=false,signature=null,importsSignature='';
   const sync=button('Import recent runs',async()=>{sync.disabled=true;try{await watch((await start(source.value)).sync_id);}catch(error){if(current(g))notice(error);}finally{sync.disabled=!source.value||configuredSources.find(s=>s.name===source.value)?.credential_status==='missing';}});
   const moreRemote=button('More provider runs',async()=>{moreRemote.disabled=true;try{await watch((await start(source.value,null,remoteCursor)).sync_id);}finally{moreRemote.disabled=false;}});
   const more=button('Load more runs',()=>load(false));
@@ -41,10 +41,10 @@ export function installExternalCI({api,el,button,query,copy,notice,target,openRu
      rows.append(row);
     }
     before=data.next_cursor;more.hidden=!before;if(!rows.childElementCount)rows.append(el('p','No imported CI runs yet. Import completed provider results above.','empty-state'));
-   }catch(error){if(current(g)){more.dataset.pageError=error.message;rows.replaceChildren(el('p',error.message,'error'),button('Retry',()=>load(true)));}}finally{loading=false;more.disabled=false;}
+   }catch(error){if(current(g)){more.dataset.pageError=error.message;if(silent){status.textContent=error.message;return;}rows.replaceChildren(el('p',error.message,'error'),button('Retry',()=>load(true)));}}finally{loading=false;more.disabled=false;}
   }
   async function loadImports(){
-   const data=await api('ci/imports?'+query({project_id:project,limit:100}));if(!current(g))return;imports.replaceChildren();
+   const data=await api('ci/imports?'+query({project_id:project,limit:100}));if(!current(g))return;const next=JSON.stringify(data.imports);if(next===importsSignature)return;importsSignature=next;imports.replaceChildren();
    for(const item of data.imports.filter(i=>['queued','running'].includes(i.state))){const row=el('div',undefined,'actions');row.append(el('span',item.source+' · '+(item.cancel_requested?'stopping':item.state)),button('Stop import',async()=>{await api('ci/cancel',{project_id:project,sync_id:item.sync_id,actor:'user',reason:'Stopped from import queue'});await loadImports();}));imports.append(row);}
   }
   await load(true);await loadImports();

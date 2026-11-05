@@ -1,0 +1,32 @@
+[
+  {
+    "id": "parent",
+    "needs": [
+
+    ]
+  },
+  {
+    "id": "child-1",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-2",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-3",
+    "needs": [
+      "parent"
+    ]
+  },
+  {
+    "id": "child-4",
+    "needs": [
+      "parent"
+    ]
+  }
+]

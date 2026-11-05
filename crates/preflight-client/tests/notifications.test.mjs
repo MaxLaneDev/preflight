@@ -8,11 +8,11 @@ test('transient toast removal cannot remove retained notifications; reload prese
  const restored=notificationJournal(storage);assert.equal(restored.items.length,2);assert.equal(restored.items[0].kind,'error');assert.equal(restored.items[0].read,false);
  restored.markRead();assert(notificationJournal(storage).items.every(item=>item.read));
 });
-test('repeat notifications coalesce, copied confirmations stay transient and history is bounded',()=>{
+test('repeat notifications coalesce, copied confirmations stay transient and history retains more than 200 entries',()=>{
  const journal=notificationJournal(fixture(),{now:()=>1000,id:()=> 'id'});
  journal.add('Copied.');assert.equal(journal.items.length,0);
  journal.add('Connection lost',true);journal.markRead();journal.add('Connection lost',true);assert.equal(journal.items[0].count,2);assert.equal(journal.items[0].read,false);
- for(let i=0;i<205;i++)journal.add('Run '+i);assert.equal(journal.items.length,200);assert.equal(journal.items[0].message,'Run 204');
+ for(let i=0;i<205;i++)journal.add('Run '+i);assert.equal(journal.items.length,206);assert.equal(journal.items[0].message,'Run 204');
 });
 test('bad or unavailable storage does not break notification delivery',()=>{
  const storage={getItem:()=>'{broken',setItem:()=>{throw Error('quota');}};

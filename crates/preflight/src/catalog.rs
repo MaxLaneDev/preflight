@@ -73,8 +73,8 @@ pub fn list(e: &Engine, r: &Query) -> Result<Value> {
     let mut rows = BTreeMap::<String, Value>::new();
     if r.kind == "pipelines" {
         let c = e.db.connection()?;
-        let mut statement=c.prepare("SELECT p.pipeline_key,p.name,p.saved_name,COUNT(*),MAX(r.id) FROM run_pipeline_identity p JOIN runs r ON r.id=p.run_id WHERE r.project_id=?1 AND NOT EXISTS(SELECT 1 FROM management_trash t WHERE t.project_id=r.project_id AND t.restored_at IS NULL AND ((t.kind='pipeline' AND t.target_id=p.pipeline_key) OR (t.kind='run' AND t.target_id=r.id))) AND p.pipeline_key>?2 AND preflight_contains(p.name||' '||p.pipeline_key,?3) AND NOT EXISTS(SELECT 1 FROM shared_executions x WHERE x.run_id=r.id) AND NOT EXISTS(SELECT 1 FROM experiment_runs x WHERE x.run_id=r.id) GROUP BY p.pipeline_key ORDER BY p.pipeline_key LIMIT ?4")?;
-        for row in statement.query_map(params![id,after,q,r.limit+1],|r|Ok((r.get::<_,String>(0)?,json!({"pipeline_key":r.get::<_,String>(0)?,"name":r.get::<_,String>(1)?,"saved_name":r.get::<_,Option<String>>(2)?,"runs":r.get::<_,u64>(3)?,"latest_run":r.get::<_,String>(4)?}))))? { let (key,value)=row?;rows.insert(key,value); }
+        let mut statement=c.prepare("SELECT *,printf('%020d',9223372036854775807-COALESCE(finished,0))||':'||pipeline_key AS sort_key FROM (SELECT p.pipeline_key,p.name,p.saved_name,COUNT(*) AS runs,MAX(r.id) AS latest_run,MAX(r.finished_at) AS finished FROM run_pipeline_identity p JOIN runs r ON r.id=p.run_id WHERE r.project_id=?1 AND NOT EXISTS(SELECT 1 FROM management_trash t WHERE t.project_id=r.project_id AND t.restored_at IS NULL AND ((t.kind='pipeline' AND t.target_id=p.pipeline_key) OR (t.kind='run' AND t.target_id=r.id))) AND preflight_contains(p.name||' '||p.pipeline_key,?3) AND NOT EXISTS(SELECT 1 FROM shared_executions x WHERE x.run_id=r.id) AND NOT EXISTS(SELECT 1 FROM experiment_runs x WHERE x.run_id=r.id) GROUP BY p.pipeline_key) WHERE sort_key>?2 ORDER BY sort_key LIMIT ?4")?;
+        for row in statement.query_map(params![id,after,q,r.limit+1],|r|Ok((r.get::<_,String>(6)?,json!({"pipeline_key":r.get::<_,String>(0)?,"name":r.get::<_,String>(1)?,"saved_name":r.get::<_,Option<String>>(2)?,"runs":r.get::<_,u64>(3)?,"latest_run":r.get::<_,String>(4)?,"finished_at":r.get::<_,Option<i64>>(5)?}))))? { let (key,value)=row?;rows.insert(key,value); }
     }
     let path = control::config_path(&project.root, &format!(".preflight/{documents}"))?;
     if path.exists() {
@@ -96,13 +96,22 @@ pub fn list(e: &Engine, r: &Query) -> Result<Value> {
             if !crate::search::matches_query(&format!("{name} {key}"), &q) {
                 continue;
             }
-            if (documents == "pipelines" && hidden.contains(&key)) || key.as_str() <= after {
+            if documents == "pipelines" && hidden.contains(&key) {
                 continue;
             }
             if control::latest(&project.root, documents, &name)? == 0 {
                 continue;
             }
-            rows.entry(key.clone())
+            let sort_key = if r.kind == "pipelines" {
+                let finished: Option<i64> = e.db.connection()?.query_row("SELECT MAX(r.finished_at) FROM runs r JOIN run_pipeline_identity p ON p.run_id=r.id WHERE r.project_id=?1 AND p.pipeline_key=?2 AND NOT EXISTS(SELECT 1 FROM management_trash t WHERE t.project_id=r.project_id AND t.kind='run' AND t.target_id=r.id AND t.restored_at IS NULL) AND NOT EXISTS(SELECT 1 FROM shared_executions x WHERE x.run_id=r.id) AND NOT EXISTS(SELECT 1 FROM experiment_runs x WHERE x.run_id=r.id)",params![id,key],|r|r.get(0))?;
+                format!("{:020}:{key}", i64::MAX - finished.unwrap_or(0))
+            } else {
+                key.clone()
+            };
+            if sort_key.as_str() <= after {
+                continue;
+            }
+            rows.entry(sort_key)
                 .or_insert_with(|| json!({"name":name,"pipeline_key":key,"saved_name":name}));
             while rows.len() > r.limit + 1 {
                 rows.pop_last();
